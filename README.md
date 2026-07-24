@@ -12,8 +12,9 @@ phone push → smart home → SMS/call escalation.
 ## Status
 
 Pre-hardware. PRD drafted; scaffold only. See [PRD.md](PRD.md) for the full
-design, [BOM.md](BOM.md) for the parts list, and [PLAN.md](PLAN.md) for
-current progress.
+design, [BOM.md](BOM.md) for the parts list, [PLAN.md](PLAN.md) for current
+progress, and [docs/edge-inference.md](docs/edge-inference.md) for how the
+AI HAT+ / model pipeline works.
 
 ## Development
 

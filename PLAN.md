@@ -6,6 +6,8 @@ defined in PRD.md §10.
 ## Current state (2026-07-24)
 
 - PRD drafted (PRD.md), BOM with links (BOM.md), repo scaffolded.
+- Architecture doc with ADRs (docs/architecture.md) — decisions 001–007
+  recorded, 008/009 deferred with revisit triggers.
 - Python 3.12 + uv, src layout, Pydantic event/config models, FPS benchmark
   script, tests for event models.
 - **No hardware purchased yet.** Next action is ordering Phase 0 items
@@ -16,7 +18,8 @@ defined in PRD.md §10.
 - [ ] Order Phase 0 hardware (BOM items 1–6)
 - [x] Repo scaffold (events, config, benchmark script, tests)
 - [ ] Flash Pi OS Lite, install Hailo runtime (`hailo-all`)
-- [ ] Camera on bench: RTSP reachable, run `poolguard-benchmark` → capture FPS
+- [ ] Camera on bench: set stream to H.265 (Pi 5 has no HW H.264 decode),
+      RTSP reachable, run `poolguard-benchmark` → capture FPS
 - [ ] Run pretrained YOLO pose via Hailo examples on the live stream
 - [ ] Exit criterion: 15+ FPS pose inference at 1080p
 

@@ -61,7 +61,7 @@ residential outdoor pool 24/7 and:
 | False alarms (siren-level) | < 1/week during normal swim activity |
 | Uptime | 24/7, auto-recovery on power/network loss, watchdog + heartbeat alert if the system itself goes down |
 | Night operation | Detection functional in dark via IR or supplemental lighting |
-| Cost | ≤ $500 total hardware |
+| Cost | ≤ $500 target; ~$570–640 at 2026-07 street prices for the recommended config (trim paths in BOM.md) |
 
 False-negative vs false-positive stance: **bias toward sensitivity.** A weekly
 false siren is acceptable; a missed submersion is not. Escalation tiers (below)
@@ -106,7 +106,11 @@ let lower-confidence events fire softer alerts.
   submersion rules active.
 - **Maintenance:** all detection paused, auto-rearms after timeout.
 
-## 6. Hardware (BOM, ~$460)
+## 6. Hardware
+
+Estimates below are launch MSRPs for architecture context; **BOM.md is the
+source of truth for current street prices, purchase links, and trim options**
+(~$570–640 street as of 2026-07).
 
 | Item | Choice | Est. |
 |---|---|---|
@@ -233,6 +237,11 @@ Two candidate form factors for the v2 underwater camera:
 - Verify PagerDuty Free actually includes phone-call notifications (sources
   conflict: SMS-only vs 100 phone+SMS/mo) — requires signing up and testing an
   escalation. If calls are paid-only, evaluate Squadcast free tier next.
+- Model licensing for public release: Ultralytics YOLOv8/11 weights are
+  AGPL-3.0, which conflicts with an MIT release if we redistribute them.
+  Options: treat the model as an external download (Hailo Model Zoo), or use a
+  permissive pose model (RTMPose / YOLOX, Apache-2.0). Irrelevant for private
+  use; decide before P5.
 - Legal review before public release: liability language for a safety-adjacent
   open-source project (disclaimer, no warranty, "not a life-saving device").
 

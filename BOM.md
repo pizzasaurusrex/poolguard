@@ -1,22 +1,33 @@
 # Bill of Materials
 
-Prices checked 2026-07-24. Phase 0 items are all you need to start —
-bench-test FPS before buying/mounting the rest.
+Street prices verified 2026-07-24 (MSRPs are lower but stock-dependent).
+Phase 0 items are all you need to start — bench-test FPS before
+buying/mounting the rest.
 
-## Phase 0 — bench rig (~$300)
+## Phase 0 — bench rig (~$480 street, less if the Pi is a kit)
 
-| # | Item | Link | Est. |
+| # | Item | Link | Street |
 |---|---|---|---|
-| 1 | Raspberry Pi 5, 8 GB | [raspberrypi.com](https://www.raspberrypi.com/products/raspberry-pi-5/) · [PiShop.us](https://www.pishop.us/product/raspberry-pi-5-8gb/) | $80 |
-| 2 | Raspberry Pi AI HAT+ 26 TOPS (Hailo-8) | [raspberrypi.com](https://www.raspberrypi.com/products/ai-hat/) · [PiShop.us](https://www.pishop.us/product/raspberry-pi-ai-hat-26-tops/) · [SparkFun](https://www.sparkfun.com/raspberry-pi-ai-hat-26-tops.html) | $110 |
-| 3 | Reolink RLC-811A 4K PoE camera (IP67, RTSP, 5× optical zoom) | [reolink.com](https://reolink.com/product/rlc-811a/) · [Amazon](https://www.amazon.com/REOLINK-Security-Detection-Spotlight-Time-Lapse/dp/B09873G7X3) | $110 |
-| 4 | 27 W USB-C PSU (official) | [raspberrypi.com](https://www.raspberrypi.com/products/27w-power-supply/) | $12 |
-| 5 | 128 GB microSD (SanDisk Extreme or similar A2 card) | [Amazon](https://www.amazon.com/dp/B09X7C7LL1) | $15 |
+| 1 | Raspberry Pi 5, 8 GB ($80 MSRP bare board; $175 street is typically a kit incl. PSU/microSD/case/cooler — a kit replaces items 4, 5, and 14) | [raspberrypi.com](https://www.raspberrypi.com/products/raspberry-pi-5/) · [PiShop.us](https://www.pishop.us/product/raspberry-pi-5-8gb/) · [CanaKit](https://www.canakit.com/raspberry-pi-5-starter-kit.html) | $175 |
+| 2 | Raspberry Pi AI HAT+ 26 TOPS (Hailo-8) | [raspberrypi.com](https://www.raspberrypi.com/products/ai-hat/) · [PiShop.us](https://www.pishop.us/product/raspberry-pi-ai-hat-26-tops/) · [SparkFun](https://www.sparkfun.com/raspberry-pi-ai-hat-26-tops.html) | $119 |
+| 3 | Reolink RLC-811A 4K PoE camera (IP67, RTSP, 5× optical zoom) | [reolink.com](https://reolink.com/product/rlc-811a/) · [Amazon](https://www.amazon.com/REOLINK-Security-Detection-Spotlight-Time-Lapse/dp/B09873G7X3) | $139 |
+| 4 | 27 W USB-C PSU (official) — skip if Pi kit includes one | [raspberrypi.com](https://www.raspberrypi.com/products/27w-power-supply/) | $12 |
+| 5 | 128 GB microSD (SanDisk Extreme or similar A2) — skip if kit includes one | [Amazon](https://www.amazon.com/dp/B09X7C7LL1) | $15 |
 | 6 | PoE+ injector, 802.3at (TP-Link TL-PoE160S) | [Amazon](https://www.amazon.com/dp/B01MDLUSE7) | $20 |
 
 Buy #1–2 from the same Pi retailer (PiShop.us / SparkFun / CanaKit) to save
 shipping. The camera ships with a short Cat5 lead; any Ethernet cable to your
 router works for the bench.
+
+### If total needs trimming back toward $500 all-in
+
+- AI HAT+ 13 TOPS instead of 26 (−~$45): risks re-buying if pose FPS falls
+  short — trim of last resort.
+- Reolink RLC-810A instead of 811A (−~$40): same 4K sensor, fixed lens (no
+  optical zoom). Fine if the mount point is close enough to frame the pool;
+  zoom mostly buys placement flexibility.
+- Bare Pi board from official reseller + à-la-carte PSU/SD (−~$60 vs kit
+  pricing when boards are in stock at MSRP).
 
 Notes:
 - **13 vs 26 TOPS (open question, PRD §11):** buying the 26 TOPS ($110 vs $70)
@@ -43,7 +54,9 @@ Notes:
 | 13 | Ethernet surge protector (camera side) | [Amazon search: "PoE ethernet surge protector"](https://www.amazon.com/s?k=poe+ethernet+surge+protector) | $15 |
 | 14 | Pi case (cooled, HAT clearance) or vented enclosure in garage | [Amazon search: "Raspberry Pi 5 case AI HAT"](https://www.amazon.com/s?k=raspberry+pi+5+case+ai+hat) | $20 |
 
-**Total both phases: ~$460** — within the ≤$500 budget (PRD §4).
+**Total both phases: ~$640 at street prices** (~$570 if the $175 Pi is a kit
+covering items 4/5/14; ~$500 with the trim options above). Original $460
+estimate used MSRPs; PRD §4 budget updated to reflect street pricing.
 Items 7–14 are commodity parts; search links given rather than specific
 listings since stock churns. Pick the siren/relay after deciding indoor vs
 outdoor siren placement.
