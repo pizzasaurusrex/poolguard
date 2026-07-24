@@ -49,6 +49,14 @@ class TestDetection:
     def test_keypoints_optional(self):
         assert make_detection().keypoints is None
 
+    def test_rejects_naive_timestamp(self):
+        with pytest.raises(ValidationError):
+            Detection(
+                frame_ts=datetime(2026, 7, 24),
+                box=BoundingBox(x=0.1, y=0.1, width=0.2, height=0.2),
+                confidence=0.9,
+            )
+
 
 class TestSafetyEvent:
     def test_round_trips_through_json(self):

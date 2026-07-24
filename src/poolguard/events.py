@@ -4,10 +4,9 @@ Every stage (detect → track → rules → alert) communicates via these immuta
 Pydantic models; no stage mutates another stage's output.
 """
 
-from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class OperatingMode(StrEnum):
@@ -45,7 +44,7 @@ class Detection(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    frame_ts: datetime
+    frame_ts: AwareDatetime
     box: BoundingBox
     confidence: float = Field(ge=0.0, le=1.0)
     keypoints: tuple[tuple[float, float, float], ...] | None = None
@@ -70,7 +69,7 @@ class SafetyEvent(BaseModel):
 
     event_type: EventType
     tier: AlertTier
-    started_at: datetime
+    started_at: AwareDatetime
     track_id: int | None = None
     mode: OperatingMode
     confidence: float = Field(ge=0.0, le=1.0)

@@ -8,6 +8,11 @@ defined in PRD.md §10.
 - PRD drafted (PRD.md), BOM with links (BOM.md), repo scaffolded.
 - Architecture doc with ADRs (docs/architecture.md) — decisions 001–007
   recorded, 008/009 deferred with revisit triggers.
+- Repo public on GitHub (building in public): MIT license, safety disclaimer,
+  secret scanning + push protection, Dependabot, main-branch ruleset.
+- Config bugfix: nested settings now load env correctly (default_factory
+  pattern), rtsp_url is SecretStr, settings frozen, AwareDatetime timestamps;
+  regression tests in tests/test_config.py (14 tests total).
 - Python 3.12 + uv, src layout, Pydantic event/config models, FPS benchmark
   script, tests for event models.
 - **No hardware purchased yet.** Next action is ordering Phase 0 items
