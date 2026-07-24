@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.egg-info/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+# footage & models are large local artifacts
+footage/
+models/
+*.mp4
+*.hef
