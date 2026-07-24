@@ -9,9 +9,34 @@ phone push → smart home → SMS/call escalation.
 > a substitute.** It is not a certified life-safety device. No detection
 > system removes the need for an attentive adult.
 
+## ⚠️ Safety disclaimer
+
+This project is **in development and has never been validated against real
+drowning scenarios**. Do not install it and trust it — at this stage it is a
+design and a scaffold, not a working detector.
+
+- PoolGuard is **not a certified life-safety device** (no UL 2621 or
+  equivalent certification) and is provided **without warranty of any kind**
+  (see [LICENSE](LICENSE)).
+- It is one layer in the
+  [CPSC "layers of protection"](https://www.cpsc.gov/Safety-Education/Safety-Education-Centers/Pool-Safely)
+  model. Fencing, self-latching gates, door alarms, and — above all —
+  **attentive adult supervision** come first. No camera system replaces any
+  of them.
+- Detection can and will fail: glare, rain, night conditions, occlusion,
+  hardware faults, and software bugs are all expected failure modes. Design
+  details and known blind spots are documented in
+  [docs/architecture.md](docs/architecture.md).
+
+If you build this, you accept full responsibility for its use.
+
 ## Status
 
-Pre-hardware. PRD drafted; scaffold only. See [PRD.md](PRD.md) for the full
+**Building in public** — this repo is live from day one, before the hardware
+has even arrived. Expect broken states, unproven rules, and revised decisions
+(recorded as ADRs in [docs/architecture.md](docs/architecture.md)).
+
+Currently: pre-hardware. PRD drafted; scaffold only. See [PRD.md](PRD.md) for the full
 design, [BOM.md](BOM.md) for the parts list, [PLAN.md](PLAN.md) for current
 progress, and [docs/edge-inference.md](docs/edge-inference.md) for how the
 AI HAT+ / model pipeline works.
@@ -42,4 +67,6 @@ tests/
 
 ## License
 
-MIT
+[MIT](LICENSE). Note: pose model weights are **not** distributed with this
+repo — they are fetched from the Hailo Model Zoo at install time and carry
+their own license (see [docs/edge-inference.md](docs/edge-inference.md)).
