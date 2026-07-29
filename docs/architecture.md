@@ -8,7 +8,7 @@
 This document explains *how* PoolGuard is built and *why* each significant
 decision was made. Requirements and success metrics live in the PRD; this
 document assumes them and records the architecture that satisfies them.
-Decisions are recorded as ADRs (§3) — new decisions get a new ADR; reversed
+Decisions are recorded as ADRs ([§3](#3-decision-records)) — new decisions get a new ADR; reversed
 decisions get a superseding ADR, never an edit.
 
 ---
@@ -22,12 +22,12 @@ vendor service in the detection path.
 
 The design is dominated by three constraints from the PRD:
 
-1. **A missed detection is worse than a false alarm** (§4) — the system is
+1. **A missed detection is worse than a false alarm** ([PRD §4](../PRD.md#4-success-criteria)) — the system is
    tuned sensitivity-first, and alert fatigue is managed structurally (tiers,
    ack flow) rather than by raising thresholds.
-2. **The siren must work with the internet down** (§2) — the highest-severity
+2. **The siren must work with the internet down** ([PRD §2](../PRD.md#2-goal)) — the highest-severity
    output path is a hardwired GPIO relay, not a network call.
-3. **≤ ~$500 hardware, installable by one person** (§4, §6) — which rules out
+3. **≤ ~$500 hardware, installable by one person** ([PRD §4](../PRD.md#4-success-criteria), [§6](../PRD.md#6-hardware)) — which rules out
    commercial multi-camera rigs and drives the single above-water camera
    choice for v1.
 
@@ -172,7 +172,7 @@ adds a dedicated underwater view for bottom confirmation.
 - *Both cameras in v1:* rejected on budget (+$150–300), install complexity
   (wall penetration or periscope rig), and sequencing — the above-water rig
   alone covers the two highest-value scenarios, and v2's underwater trade
-  study (over-the-edge housing vs floating buoy, PRD §7) benefits from real
+  study (over-the-edge housing vs floating buoy, [PRD §7](../PRD.md#7-above-water-vs-underwater-camera-analysis)) benefits from real
   footage first.
 
 **Consequences.** v1's known blind spot is direct bottom observation in
@@ -229,7 +229,7 @@ regression-testable diffs.
 
 **Context.** Frigate is the mature open-source NVR: RTSP handling, recording,
 motion gating, Home Assistant integration for free. Extending it was the
-obvious build-vs-adopt question (PRD §11).
+obvious build-vs-adopt question ([PRD §11](../PRD.md#11-open-questions)).
 
 **Decision.** The detection pipeline is custom Python 3.12 (uv, src layout,
 ruff), because the core value — pose-based rules over persistent tracks — sits
@@ -290,7 +290,7 @@ which ntfy cannot do. Only unacknowledged emergencies consume SMS quota
   evaluated only if PagerDuty falls through.
 
 **Consequences.** A third-party dependency enters the *last* escalation rung —
-acceptable per the failure model (§2.2) because the siren has already fired
+acceptable per the failure model ([§2.2](#22-trust-and-failure-model)) because the siren has already fired
 locally. The named condition: **verify free-tier voice calls by signing up and
 running a real escalation drill (P3)**; if calls are paid-only, supersede this
 ADR with the Squadcast evaluation.
@@ -327,7 +327,7 @@ commercially validated and zero-install but forces on-float inference,
 IP68/chlorine sealing, and a drifting viewpoint; the housed camera is wired
 and stable but visible and cable-in-water. A Pi Zero 2 W in a sealed dry-box
 on a foam collar is the named cheap prototype to de-risk the buoy. Recorded
-now so the option analysis (PRD §7) isn't re-litigated from scratch.
+now so the option analysis ([PRD §7](../PRD.md#7-above-water-vs-underwater-camera-analysis)) isn't re-litigated from scratch.
 
 ### ADR-009 (Deferred): Pose model licensing for public release
 
@@ -336,7 +336,7 @@ now so the option analysis (PRD §7) isn't re-litigated from scratch.
 Ultralytics YOLO weights are AGPL-3.0, which conflicts with redistributing
 them inside an MIT release. Named options: ship the model as an
 install-time external download from the Hailo Model Zoo, or switch to an
-Apache-2.0 pose model (RTMPose, YOLOX). See edge-inference.md §Licensing.
+Apache-2.0 pose model (RTMPose, YOLOX). See [edge-inference.md §Licensing](edge-inference.md#licensing-matters-for-the-p5-public-release).
 
 ---
 
@@ -348,7 +348,7 @@ an input to the rules engine, not a filter on alerts — an event that fires in
 swim mode carries different semantics, not suppressed severity.
 
 **Observability.** The system self-reports degradation: heartbeat with FPS
-floor, camera-offline detection, lens-blocked detection. Rationale in §2.2 —
+floor, camera-offline detection, lens-blocked detection. Rationale in [§2.2](#22-trust-and-failure-model) —
 for a safety device, "silently down" is the worst state, worse than "off."
 
 **Testing strategy.** The replay harness is the load-bearing piece: recorded,

@@ -1,6 +1,6 @@
 # Edge Inference: AI HAT+ and the Model Strategy
 
-How PoolGuard runs neural networks on-device. Companion to PRD §5–6.
+How PoolGuard runs neural networks on-device. Companion to [PRD §5](../PRD.md#5-system-overview)–[§6](../PRD.md#6-hardware).
 
 ## The hardware
 
@@ -61,7 +61,7 @@ Consequences:
 
 Ultralytics YOLOv8/11 **code and weights are AGPL-3.0** — redistributing them
 inside an MIT-licensed release is a conflict. Options, decided before P5
-(PRD §11):
+([PRD §11](../PRD.md#11-open-questions)):
 
 - Treat the model as an external artifact users fetch from the Hailo Model
   Zoo at install time (common, defensible), or

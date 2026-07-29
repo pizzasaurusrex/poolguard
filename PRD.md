@@ -92,6 +92,13 @@ let lower-confidence events fire softer alerts.
 3. **Rules engine** (interpretable, tunable — not end-to-end black box):
    - *Distress:* vertical posture + high-frequency arm motion + little horizontal
      travel, sustained > N seconds ("instinctive drowning response" signature).
+     **Core principle: drowning doesn't look like drowning** — real distress is
+     quiet and vertical (ladder-climbing arm motion, head barely clearing the
+     surface), not the waving/yelling movie version. The hardest discrimination
+     is distress vs. treading water: treading has wider, smoother arm motion
+     with the head riding higher and some horizontal drift. Getting this
+     distinction right is the central detection problem; glare is the biggest
+     risk to it (hence the polarizer and steep mount angle).
    - *Submersion:* tracked person disappears below surface and does not resurface
      within N seconds; or detected shape at bottom with no motion.
    - *Unsupervised entry:* person detected in water when system is in "armed"
@@ -231,7 +238,17 @@ Two candidate form factors for the v2 underwater camera:
 - Hailo-8 (26 TOPS, $110) vs Hailo-8L (13 TOPS, $70): benchmark pose model on
   both before buying, if possible.
 - Geofence/presence-based auto-arming vs manual-only modes for v1.
-- v2 underwater form factor: over-the-edge housed cam vs floating buoy (PRD §7).
+- Emergency-tier attention channel: is a siren actually the right primary
+  attention-grabber? External feedback (2026-07-28): during a loud pool party a
+  siren (or a phone push) can be drowned out or missed; a **visual alert at the
+  10-ft mount — strobe, spinning/waving flag, high-brightness LEDs** — grabs
+  peripheral attention, works in noise, and is a cheaper false positive than a
+  mid-party siren. Armed mode (nobody should be in the pool) maps fine to
+  push + siren; swim mode (crowd present) likely wants the visual channel.
+  LEDs/strobe are an easy GPIO add alongside the existing siren relay.
+  Related: alert probably only needs to say "look at the pool," not localize
+  the swimmer — v1 targets backyard pools a single glance can cover.
+- v2 underwater form factor: over-the-edge housed cam vs floating buoy ([§7](#7-above-water-vs-underwater-camera-analysis)).
   A Pi Zero 2 W + camera in a sealed dry-box on a foam collar is a cheap
   weekend prototype to de-risk the buoy option.
 - Verify PagerDuty Free actually includes phone-call notifications (sources

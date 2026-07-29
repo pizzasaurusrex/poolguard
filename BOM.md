@@ -30,7 +30,7 @@ router works for the bench.
   pricing when boards are in stock at MSRP).
 
 Notes:
-- **13 vs 26 TOPS (open question, PRD §11):** buying the 26 TOPS ($110 vs $70)
+- **13 vs 26 TOPS (open question, [PRD §11](PRD.md#11-open-questions)):** buying the 26 TOPS ($110 vs $70)
   is the recommended default — pose models + headroom for a second camera in
   v2. If P0 benchmarks show huge slack, nothing is lost; if 13 TOPS came up
   short, we'd be re-buying.
@@ -56,7 +56,7 @@ Notes:
 
 **Total both phases: ~$640 at street prices** (~$570 if the $175 Pi is a kit
 covering items 4/5/14; ~$500 with the trim options above). Original $460
-estimate used MSRPs; PRD §4 budget updated to reflect street pricing.
+estimate used MSRPs; [PRD §4](PRD.md#4-success-criteria) budget updated to reflect street pricing.
 Items 7–14 are commodity parts; search links given rather than specific
 listings since stock churns. Pick the siren/relay after deciding indoor vs
 outdoor siren placement.

@@ -1,7 +1,7 @@
 # PLAN — progress journal
 
 Update this file with every commit so a fresh session can resume. Phases are
-defined in PRD.md §10.
+defined in [PRD.md §10](PRD.md#10-phases).
 
 ## Current state (2026-07-24)
 
