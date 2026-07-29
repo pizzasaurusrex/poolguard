@@ -119,6 +119,34 @@ a passively-manageable power/heat envelope for a garage install.
 - Exit criterion P0 validates the bet: if the bench rig can't hold 15 FPS
   pose at 1080p, fall back to detection-only + track heuristics, then Jetson.
 
+**2026-07-29 pricing addendum.** The cost assumptions behind this ADR have
+shifted materially since it was written. Memory cost pressure from AI
+infrastructure demand pushed DRAM-driven component costs up across the board
+in late 2025 into 2026, not specific to any one retailer. As of this date:
+
+- Pi 5 8GB bare board: ~$170-175 across every checked reseller (PiShop,
+  Micro Center, CanaKit), versus the $80 MSRP this ADR's budget math assumed.
+  This is now roughly double the original board-cost assumption.
+- AI HAT+ 26 TOPS: ~$110, close to original estimate, the $40 delta over the
+  13 TOPS variant is unchanged.
+- Full BOM (Phase 0 + Phase 3) is now ~$630-640 street, versus the ~$460
+  MSRP-based figure this ADR implicitly assumed when weighing the 26 TOPS
+  vs 13 TOPS tradeoff at "+$40 for headroom."
+
+**Reopened question:** the 26 TOPS vs 13 TOPS tradeoff was framed as a small
+delta justified by pose-model headroom and v2's second camera stream. With
+total system cost up ~40% and the Pi board itself now the single largest
+line item, that $40 delta is proportionally smaller than it was, which
+weakens the case for trimming here specifically. But since v2 (ADR-008) is
+still deferred and unscheduled, the "headroom for a second stream"
+justification is speculative cost, not committed cost. Worth revisiting
+once P0 benchmarks are in: if 13 TOPS clears the 15 FPS bar with margin,
+the $40 saved is better spent absorbing the Pi board's price increase than
+insuring against a v2 that may not happen for a year or more.
+
+No action taken yet, this is a note for the P5/ADR-008 revisit or for
+whoever reviews the BOM next, not a superseding decision.
+
 ### ADR-002: All inference on-device; no cloud in the detection path
 
 **Status:** Accepted · 2026-07-24

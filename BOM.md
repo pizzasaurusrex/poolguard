@@ -4,6 +4,10 @@ Street prices verified 2026-07-24 (MSRPs are lower but stock-dependent).
 Phase 0 items are all you need to start — bench-test FPS before
 buying/mounting the rest.
 
+> **Cheaper P0 path:** see [POC-BOM.md](POC-BOM.md) (~$317, verified
+> 2026-07-29) — defers the camera and PoE injector by using a free RTSP
+> source for the bench test.
+
 ## Phase 0 — bench rig (~$480 street, less if the Pi is a kit)
 
 | # | Item | Link | Street |
