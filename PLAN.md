@@ -1,52 +1,71 @@
 # PLAN — progress journal
 
 Update this file with every commit so a fresh session can resume. Phases are
-defined in [PRD.md §10](PRD.md#10-phases).
+defined in [PRD.md §10](PRD.md#10-phases). Sequencing changed 2026-07-29
+(ADR-010): software is built and tested on a dev machine first; hardware is
+ordered only when the P0 bench question (Hailo FPS) is the last one open.
 
-## Current state (2026-07-24)
+## Current state (2026-07-29)
 
-- PRD drafted (PRD.md), BOM with links (BOM.md), repo scaffolded.
-- Architecture doc with ADRs (docs/architecture.md) — decisions 001–007
-  recorded, 008/009 deferred with revisit triggers.
+- PRD drafted (PRD.md), BOM with links (BOM.md), POC BOM (POC-BOM.md).
+- Architecture doc with ADRs (docs/architecture.md) — 001–007, 010 accepted;
+  008/009 deferred with revisit triggers.
 - Repo public on GitHub (building in public): MIT license, safety disclaimer,
   secret scanning + push protection, Dependabot, main-branch ruleset.
-- Config bugfix: nested settings now load env correctly (default_factory
-  pattern), rtsp_url is SecretStr, settings frozen, AwareDatetime timestamps;
-  regression tests in tests/test_config.py (14 tests total).
-- Python 3.12 + uv, src layout, Pydantic event/config models, FPS benchmark
-  script, tests for event models.
-- **No hardware purchased yet.** Next action is ordering Phase 0 items
-  (BOM.md items 1–6).
+- Python 3.12 + uv, src layout, frozen Pydantic event/config models, FPS
+  benchmark script, tests for events and config (14 tests).
+- **No hardware purchased. Hardware order is deliberately deferred (ADR-010)**
+  until PD exit criteria are met.
 
-## P0 — bench rig  ⬅ current
+## PD — dev-machine sandbox (no hardware, $0)  ⬅ current
 
-- [ ] Order Phase 0 hardware (BOM items 1–6)
-- [x] Repo scaffold (events, config, benchmark script, tests)
+Work happens in reviewable PRs against `main`.
+
+- [ ] Vision seam: `PoseEstimator` protocol + Ultralytics dev backend,
+      `FrameSource` protocol + video-file source (PR 2)
+- [ ] Replay CLI: video file → pose → detection stream (PR 3)
+- [ ] Test footage: collect public/self-shot pool clips; staged dry-land
+      "distress" clip for rule smoke tests
+- [ ] Tracking (ByteTrack or equivalent) over pose detections
+- [ ] Rules engine v0: distress / submersion / entry over track histories
+      (thresholds in config)
+- [ ] Replay-harness regression suite over labeled clips
+- [ ] Local RTSP loop via mediamtx to exercise ingest/reconnect path
+- [ ] PagerDuty Free signup + escalation drill — resolves ADR-006's named
+      condition (voice calls on free tier?) with zero hardware
+- [ ] Exit criteria: rules engine produces correct events on labeled test
+      clips end-to-end on the dev machine; alert manager works with mock siren
+
+## P0 — bench rig (hardware validation only)
+
+Narrowed by ADR-010: the only open questions are Hailo throughput and the
+Pi-specific paths. Order hardware (POC-BOM.md) only after PD exits.
+
+- [ ] Order POC hardware (~$317, POC-BOM.md)
 - [ ] Flash Pi OS Lite, install Hailo runtime (`hailo-all`)
-- [ ] Camera on bench: set stream to H.265 (Pi 5 has no HW H.264 decode),
-      RTSP reachable, run `poolguard-benchmark` → capture FPS
-- [ ] Run pretrained YOLO pose via Hailo examples on the live stream
-- [ ] Exit criterion: 15+ FPS pose inference at 1080p
+- [ ] Hailo backend for the `PoseEstimator` seam (`.hef` via HailoRT)
+- [ ] Run the PD replay suite on-target; re-tune thresholds for INT8 deltas
+- [ ] Exit criterion: 15+ FPS pose inference at 1080p (looped RTSP source
+      per ADR-002 addendum; no camera purchase yet)
 
 ## P1 — pool install + footage library
 
+- [ ] Buy camera + PoE injector (deferred BOM items) after P0 passes
 - [ ] Site survey: mount point, cable run length (finalize BOM items 11–12)
 - [ ] Mount camera, run cable, weatherize
 - [ ] Recording harness → 2 weeks of sun/rain/night/swimmer footage
-- [ ] Label clip library; build replay harness for offline pipeline testing
+- [ ] Label clip library; fold real footage into the PD replay suite
 
-## P2 — detection + rules
+## P2 — detection + rules tuning on real footage
 
-- [ ] Tracking (ByteTrack) over pose detections
-- [ ] Rules engine: distress / submersion / entry (thresholds in config)
-- [ ] Replay-harness test suite over labeled clips
+- [ ] Re-tune tracking + rules thresholds against P1 footage
 - [ ] Staged scenario tests (mock distress, weighted mannequin, doll entry)
 
 ## P3 — alerting
 
 - [ ] Siren via GPIO relay; armed/swim/maintenance modes
 - [ ] ntfy push with snapshot; Home Assistant via MQTT
-- [ ] Twilio SMS→call escalation with ack flow
+- [ ] PagerDuty emergency escalation (per ADR-006; Twilio fallback)
 - [ ] End-to-end staged drill: < 5 s to siren
 
 ## P4 — hardening

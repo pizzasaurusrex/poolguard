@@ -42,6 +42,19 @@ Consequences:
 - Cooling: use the active cooler; the HAT stacks above it on the 16 mm GPIO
   extender included in the box.
 
+## Dev backend (no Hailo required)
+
+Per ADR-010, the pipeline develops against a `PoseEstimator` seam with an
+**Ultralytics backend** on the dev machine: YOLOv8/11-pose via the `vision`
+extra, MPS-accelerated on Apple Silicon, emitting the same COCO 17-keypoint
+`Detection` events the Hailo backend will. Differences to remember when
+results move to the Pi:
+
+- Dev runs FP16/FP32 weights; the `.hef` is INT8-quantized — expect slightly
+  noisier keypoints on-target, and re-tune rule thresholds (they're config).
+- Dev throughput says nothing about Hailo throughput; the 15 FPS exit
+  criterion is only answerable on the bench rig.
+
 ## Model strategy (three stages)
 
 1. **P0 — stock model.** Pretrained YOLOv8s-pose from the Hailo Model Zoo,
