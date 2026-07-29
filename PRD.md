@@ -211,6 +211,12 @@ Two candidate form factors for the v2 underwater camera:
 
 ## 10. Phases
 
+> **Sequencing note (2026-07-29, ADR-010):** a hardware-free phase **PD —
+> dev-machine sandbox** now precedes P0: the pipeline (pose backend seam,
+> tracking, rules, replay harness) is built and tested on a dev machine
+> against video files first. P0 narrows to hardware validation, and most of
+> P2's software scope lands during PD. PLAN.md carries the live breakdown.
+
 1. **P0 — Bench rig:** Pi + AI HAT + camera on desk; run pretrained YOLO pose on
    RTSP; measure FPS/latency. *Exit: 15+ FPS pose at 1080p.*
 2. **P1 — Pool install + recording:** mount camera, capture real footage across

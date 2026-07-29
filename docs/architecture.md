@@ -366,6 +366,51 @@ them inside an MIT release. Named options: ship the model as an
 install-time external download from the Hailo Model Zoo, or switch to an
 Apache-2.0 pose model (RTMPose, YOLOX). See [edge-inference.md §Licensing](edge-inference.md#licensing-matters-for-the-p5-public-release).
 
+### ADR-010: Software-first development on a dev machine; hardware purchase deferred
+
+**Status:** Accepted · 2026-07-29
+
+**Context.** The original phase order (PRD §10) buys the P0 bench rig first,
+then builds software against it. But the Pi + Hailo answers only two
+questions the dev machine cannot: sustained NPU throughput (the 15 FPS exit
+criterion) and the GPIO siren path. The genuinely novel risk — do the
+distress/submersion/entry rules work over pose tracks — lives entirely in
+CPU-side Python (ADR-004) and needs only footage, which is free. Meanwhile
+the POC BOM is ~$317 and the pricing addendum on ADR-001 shows hardware
+costs rising; spend should stay proportional to validated progress.
+
+**Decision.** Build and test the pipeline on a dev machine (macOS) before
+ordering hardware. The inference stage becomes an explicit seam: a
+`PoseEstimator` protocol with two backends —
+
+- **Ultralytics backend (dev):** YOLOv8/11-pose via the `vision` extra,
+  MPS-accelerated on Apple Silicon, same COCO 17-keypoint output as the
+  Hailo Model Zoo variants.
+- **Hailo backend (Pi, P0):** the compiled `.hef` path per
+  edge-inference.md; written when hardware arrives.
+
+Frame input comes from video files or a looped local RTSP stream (mediamtx),
+per the ADR-002 addendum. The siren is a logging mock until P3. Downstream
+stages consume the same frozen event models (ADR-007) either way and cannot
+tell the backends apart.
+
+**Alternatives considered.**
+
+- *Buy the bench rig now, develop on-target:* rejected — turns the Pi into a
+  development bottleneck and spends ~$317 before the detection approach has
+  produced a single true positive on any footage.
+- *Skip the seam, write Hailo-only code:* rejected — strands all pipeline
+  work behind hardware delivery and makes the ADR-001 Jetson escape hatch
+  more expensive to exercise.
+
+**Consequences.** The dev backend runs FP weights while the Hailo runs INT8
+quantized ones, so keypoint quality on the Pi may degrade slightly versus
+what rules were tuned against — rule thresholds are config (ADR-004), so
+this is a re-tuning pass at P0/P1, not a redesign. P0's meaning narrows to
+pure hardware validation: flash, install runtime, confirm ≥15 FPS pose —
+an afternoon, not a platform bring-up. The PagerDuty free-tier voice drill
+(ADR-006's named condition) also moves earlier since it needs no hardware.
+
 ---
 
 ## 4. Cross-cutting concerns
