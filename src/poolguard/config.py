@@ -9,7 +9,7 @@ its own POOLGUARD_<SECTION>_* env vars at Settings() construction time —
 nesting them as plain fields would bypass their env machinery entirely.
 """
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from poolguard.events import OperatingMode
@@ -54,6 +54,28 @@ class TrackingSettings(BaseSettings):
         default=(0.0, 0.0, 1.0, 1.0),
         description="Water region as normalized (x, y, width, height); default is whole frame",
     )
+
+    @model_validator(mode="after")
+    def _confidence_band_is_ordered(self) -> "TrackingSettings":
+        # Equal values are allowed (an empty rescue band is a legitimate
+        # way to disable the rescue pass).
+        if self.low_confidence > self.high_confidence:
+            raise ValueError(
+                f"low_confidence ({self.low_confidence}) must be "
+                f"<= high_confidence ({self.high_confidence})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _pool_zone_is_normalized(self) -> "TrackingSettings":
+        x, y, width, height = self.pool_zone
+        if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
+            raise ValueError(f"pool_zone origin must be within [0, 1]: {self.pool_zone}")
+        if not (0.0 < width <= 1.0 and 0.0 < height <= 1.0):
+            raise ValueError(
+                f"pool_zone width/height must be in (0, 1]: {self.pool_zone}"
+            )
+        return self
 
 
 class RulesSettings(BaseSettings):
