@@ -105,9 +105,17 @@ def _draw_coasting(
     system is watching this spot" and show how long the person has been
     unseen (person.seconds_since_last_seen).
     """
-    # TODO(human): implement the ghost-box rendering. See the "Learn by
-    # Doing" request in the conversation for guidance.
-    raise NotImplementedError
+    cv2.rectangle(canvas, top_left, bottom_right, color, 1)
+    cv2.putText(
+        canvas,
+        f"#{person.track_id} (unseen/lost {person.seconds_since_last_seen:.1f}s)",
+        (top_left[0], max(top_left[1] - 6, 12)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.5,
+        color,
+        1,
+        cv2.LINE_AA,
+    )
 
 
 def render_tracked_replay(
@@ -133,8 +141,7 @@ def render_tracked_replay(
         return cv2.VideoWriter(str(out_path), fourcc, fps, (width, height))
 
     frames_and_results = (
-        (frame, result)
-        for frame, result in _tracked_frames(source, estimator, settings)
+        (frame, result) for frame, result in _tracked_frames(source, estimator, settings)
     )
 
     try:

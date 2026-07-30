@@ -55,17 +55,13 @@ class TestAnnotateFrame:
         assert canvas.any()  # something was drawn
 
     def test_coasting_person_is_drawn(self) -> None:
-        canvas = annotate_frame(
-            blank_image(), (person(1, unseen=4.2),), pool_zone=(0, 0, 1, 1)
-        )
+        canvas = annotate_frame(blank_image(), (person(1, unseen=4.2),), pool_zone=(0, 0, 1, 1))
 
         assert canvas.any()
 
     def test_coasting_looks_different_from_live(self) -> None:
         live = annotate_frame(blank_image(), (person(1),), pool_zone=(0, 0, 1, 1))
-        ghost = annotate_frame(
-            blank_image(), (person(1, unseen=4.2),), pool_zone=(0, 0, 1, 1)
-        )
+        ghost = annotate_frame(blank_image(), (person(1, unseen=4.2),), pool_zone=(0, 0, 1, 1))
 
         assert (live != ghost).any()
 
@@ -99,9 +95,7 @@ class OnePersonEstimator:
 
 def test_render_tracked_replay_writes_video(tmp_path: Path) -> None:
     image = blank_image()
-    frames = [
-        Frame(image=image, ts=START + timedelta(seconds=i / 4), index=i) for i in range(6)
-    ]
+    frames = [Frame(image=image, ts=START + timedelta(seconds=i / 4), index=i) for i in range(6)]
     out = tmp_path / "annotated.mp4"
 
     results = list(

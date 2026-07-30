@@ -72,9 +72,7 @@ class TrackingSettings(BaseSettings):
         if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
             raise ValueError(f"pool_zone origin must be within [0, 1]: {self.pool_zone}")
         if not (0.0 < width <= 1.0 and 0.0 < height <= 1.0):
-            raise ValueError(
-                f"pool_zone width/height must be in (0, 1]: {self.pool_zone}"
-            )
+            raise ValueError(f"pool_zone width/height must be in (0, 1]: {self.pool_zone}")
         return self
 
 

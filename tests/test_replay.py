@@ -40,9 +40,7 @@ class StubEstimator:
 
 def make_frames(count: int) -> list[Frame]:
     image = np.zeros((8, 8, 3), dtype=np.uint8)
-    return [
-        Frame(image=image, ts=START + timedelta(seconds=i), index=i) for i in range(count)
-    ]
+    return [Frame(image=image, ts=START + timedelta(seconds=i), index=i) for i in range(count)]
 
 
 def test_run_replay_pairs_frames_with_detections() -> None:
