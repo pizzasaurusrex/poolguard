@@ -6,6 +6,7 @@ pool zone, and coasting tracks with their unseen timers, which is the
 submersion signal made visible.
 """
 
+from collections import deque
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -15,7 +16,7 @@ import numpy as np
 from poolguard.config import TrackingSettings
 from poolguard.events import TrackedPerson
 from poolguard.replay import TrackedFrameResult, run_tracked_replay
-from poolguard.vision.frames import FrameSource
+from poolguard.vision.frames import Frame, FrameSource
 from poolguard.vision.pose import PoseEstimator
 
 FALLBACK_FPS = 15.0
@@ -138,14 +139,13 @@ def render_tracked_replay(
     def open_writer(canvas: np.ndarray, fps: float) -> cv2.VideoWriter:
         height, width = canvas.shape[:2]
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        return cv2.VideoWriter(str(out_path), fourcc, fps, (width, height))
-
-    frames_and_results = (
-        (frame, result) for frame, result in _tracked_frames(source, estimator, settings)
-    )
+        writer = cv2.VideoWriter(str(out_path), fourcc, fps, (width, height))
+        if not writer.isOpened():
+            raise RuntimeError(f"could not open video writer for {out_path}")
+        return writer
 
     try:
-        for frame, result in frames_and_results:
+        for frame, result in _tracked_frames(source, estimator, settings):
             canvas = annotate_frame(frame.image, result.people, settings.pool_zone)
             if writer is None:
                 if pending is None:
@@ -172,19 +172,21 @@ def render_tracked_replay(
 
 def _tracked_frames(
     source: FrameSource, estimator: PoseEstimator, settings: TrackingSettings
-) -> Iterator[tuple]:
+) -> Iterator[tuple[Frame, TrackedFrameResult]]:
     """Pair each source frame with its tracked result.
 
     run_tracked_replay consumes the source internally, so tee the frames
-    here: wrap the source to remember the frame currently in flight.
+    here: wrap the source to remember frames in flight, oldest first, so
+    pairing stays correct even if a future run_tracked_replay buffers or
+    looks ahead instead of consuming in strict lockstep.
     """
-    current: list = []
+    current: deque[Frame] = deque()
 
     class _Tap:
-        def frames(self) -> Iterator:
+        def frames(self) -> Iterator[Frame]:
             for frame in source.frames():
                 current.append(frame)
                 yield frame
 
     for result in run_tracked_replay(_Tap(), estimator, settings):
-        yield current.pop(), result
+        yield current.popleft(), result

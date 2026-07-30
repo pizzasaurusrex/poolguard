@@ -111,3 +111,18 @@ def test_render_tracked_replay_writes_video(tmp_path: Path) -> None:
     assert capture.isOpened()
     assert int(capture.get(cv2.CAP_PROP_FRAME_COUNT)) == 6
     capture.release()
+
+
+def test_render_tracked_replay_raises_if_writer_cannot_open(tmp_path: Path) -> None:
+    # A nonexistent parent directory makes cv2.VideoWriter construct but
+    # never open — the exact silent-failure mode open_writer must catch.
+    image = blank_image()
+    frames = [Frame(image=image, ts=START, index=0)]
+    out = tmp_path / "missing_dir" / "annotated.mp4"
+
+    with pytest.raises(RuntimeError, match="could not open video writer"):
+        list(
+            render_tracked_replay(
+                ListFrameSource(frames), OnePersonEstimator(), TrackingSettings(), out
+            )
+        )
