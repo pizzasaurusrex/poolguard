@@ -33,7 +33,12 @@ def main() -> None:
     parser.add_argument("--min-confidence", type=float, default=0.25)
     parser.add_argument("--per-frame", action="store_true", help="print each frame's detections")
     parser.add_argument("--track", action="store_true", help="run the tracking stage")
+    parser.add_argument(
+        "--render", metavar="OUT_MP4", help="write an annotated video (implies --track)"
+    )
     args = parser.parse_args()
+    if args.render:
+        args.track = True
 
     source = VideoFileFrameSource(args.video)
     estimator = UltralyticsPoseEstimator(model=args.model, min_confidence=args.min_confidence)
@@ -43,7 +48,14 @@ def main() -> None:
     start = time.monotonic()
 
     if args.track:
-        for tracked in run_tracked_replay(source, estimator, TrackingSettings()):
+        settings = TrackingSettings()
+        if args.render:
+            from poolguard.vision.render import render_tracked_replay
+
+            tracked_results = render_tracked_replay(source, estimator, settings, args.render)
+        else:
+            tracked_results = run_tracked_replay(source, estimator, settings)
+        for tracked in tracked_results:
             summary = summary.fold(tracked)
             track_ids.update(p.track_id for p in tracked.people)
             if args.per_frame:
