@@ -24,6 +24,38 @@ class CameraSettings(BaseSettings):
     target_fps: int = Field(default=15, ge=1, le=60)
 
 
+class TrackingSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="POOLGUARD_TRACKING_", frozen=True)
+
+    high_confidence: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Detections at or above this confidence match tracks and spawn new ones",
+    )
+    low_confidence: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Floor for the rescue pass; weaker detections are ignored entirely",
+    )
+    iou_min: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Minimum box overlap for a detection to match an existing track",
+    )
+    max_coast_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        description="How long an unseen track survives before it is dropped",
+    )
+    pool_zone: tuple[float, float, float, float] = Field(
+        default=(0.0, 0.0, 1.0, 1.0),
+        description="Water region as normalized (x, y, width, height); default is whole frame",
+    )
+
+
 class RulesSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="POOLGUARD_RULES_", frozen=True)
 
@@ -47,5 +79,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", frozen=True)
 
     camera: CameraSettings = Field(default_factory=CameraSettings)
+    tracking: TrackingSettings = Field(default_factory=TrackingSettings)
     rules: RulesSettings = Field(default_factory=RulesSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
