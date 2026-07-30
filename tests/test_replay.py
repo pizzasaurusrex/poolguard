@@ -75,6 +75,33 @@ def test_replay_of_empty_source_yields_nothing() -> None:
     assert results == []
 
 
+class DriftingPersonEstimator:
+    """One person whose box drifts slightly right each frame."""
+
+    def estimate(self, frame: Frame) -> tuple[Detection, ...]:
+        return (
+            Detection(
+                frame_ts=frame.ts,
+                box=BoundingBox(x=0.1 + 0.01 * frame.index, y=0.1, width=0.2, height=0.3),
+                confidence=0.9,
+            ),
+        )
+
+
+def test_tracked_replay_assigns_stable_ids() -> None:
+    from poolguard.config import TrackingSettings
+    from poolguard.replay import run_tracked_replay
+
+    source = ListFrameSource(make_frames(3))
+    settings = TrackingSettings()
+
+    results = list(run_tracked_replay(source, DriftingPersonEstimator(), settings))
+
+    assert [r.frame_index for r in results] == [0, 1, 2]
+    ids = {person.track_id for result in results for person in result.people}
+    assert ids == {1}  # same person, same ID, every frame
+
+
 def test_frame_result_is_frozen() -> None:
     result = FrameResult(frame_index=0, ts=START, detections=())
 

@@ -7,7 +7,7 @@ POOLGUARD_CAMERA_* env vars when constructing the top-level Settings.
 import pytest
 from pydantic import ValidationError
 
-from poolguard.config import Settings
+from poolguard.config import Settings, TrackingSettings
 from poolguard.events import OperatingMode
 
 RTSP = "rtsp://user:pass@10.0.0.5:554/h265Preview_01_main"
@@ -45,6 +45,35 @@ def test_rtsp_credentials_do_not_leak_in_repr(camera_env: None) -> None:
     settings = Settings()
     assert "pass" not in repr(settings)
     assert "pass" not in str(settings.camera)
+
+
+class TestTrackingSettingsValidation:
+    """Cross-field invariants the per-field ge/le checks can't express."""
+
+    def test_low_confidence_above_high_confidence_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="low_confidence"):
+            TrackingSettings(high_confidence=0.5, low_confidence=0.6)
+
+    def test_equal_thresholds_allowed_to_disable_rescue(self) -> None:
+        settings = TrackingSettings(high_confidence=0.5, low_confidence=0.5)
+        assert settings.low_confidence == settings.high_confidence
+
+    def test_pool_zone_origin_outside_frame_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="pool_zone"):
+            TrackingSettings(pool_zone=(-0.1, 0.0, 1.0, 1.0))
+
+    def test_pool_zone_zero_size_rejected(self) -> None:
+        # A zero-width zone makes in_water always False — the silent
+        # failure mode that would disable the submersion rule.
+        with pytest.raises(ValidationError, match="pool_zone"):
+            TrackingSettings(pool_zone=(0.2, 0.2, 0.0, 0.5))
+
+    def test_pool_zone_oversized_component_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="pool_zone"):
+            TrackingSettings(pool_zone=(0.0, 0.0, 1.5, 1.0))
+
+    def test_default_pool_zone_still_valid(self) -> None:
+        assert TrackingSettings().pool_zone == (0.0, 0.0, 1.0, 1.0)
 
 
 def test_settings_are_frozen(camera_env: None) -> None:

@@ -26,7 +26,8 @@ Work happens in reviewable PRs against `main`.
 - [ ] Replay CLI: video file → pose → detection stream (PR 3)
 - [ ] Test footage: collect public/self-shot pool clips; staged dry-land
       "distress" clip for rule smoke tests
-- [ ] Tracking (ByteTrack or equivalent) over pose detections
+- [x] Tracking (ByteTrack-style two-pass IoU, custom) over pose detections —
+      `tracking.py`, `--track` on poolguard-replay (PR 5)
 - [ ] Rules engine v0: distress / submersion / entry over track histories
       (thresholds in config)
 - [ ] Replay-harness regression suite over labeled clips

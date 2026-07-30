@@ -12,3 +12,7 @@ footage/
 models/
 *.mp4
 *.hef
+clips/
+*.pt
+runs/
+.DS_Store
