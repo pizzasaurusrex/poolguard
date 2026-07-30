@@ -22,7 +22,9 @@ class Frame(BaseModel):
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     image: np.ndarray
-    """BGR pixel data, shape (height, width, 3). Treated as read-only."""
+    """BGR pixel data, shape (height, width, 3). Validation marks the array
+    read-only in place (`setflags(write=False)`), so the caller's reference
+    is frozen too — pass a copy if you still need a writable array."""
     ts: AwareDatetime
     index: int = Field(ge=0)
 

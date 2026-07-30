@@ -22,6 +22,8 @@ FALLBACK_FPS = 30.0
 class VideoFileFrameSource:
     def __init__(self, path: str | Path, start_time: AwareDatetime | None = None) -> None:
         self._path = Path(path)
+        if start_time is not None and start_time.tzinfo is None:
+            raise ValueError("start_time must be timezone-aware")
         self._start_time = start_time if start_time is not None else REPLAY_EPOCH
         if not self._path.is_file():
             raise FileNotFoundError(f"video file not found: {self._path}")

@@ -60,3 +60,8 @@ def test_replay_is_reproducible(video_path: Path) -> None:
 def test_missing_file_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         VideoFileFrameSource(tmp_path / "nope.mp4")
+
+
+def test_naive_start_time_raises(video_path: Path) -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        VideoFileFrameSource(video_path, start_time=datetime(2026, 7, 29, 12, 0, 0))

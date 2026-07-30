@@ -13,8 +13,6 @@ import numpy as np
 from poolguard.events import BoundingBox, Detection
 from poolguard.vision.frames import Frame
 
-COCO_KEYPOINT_COUNT = 17
-
 
 class PoseEstimator(Protocol):
     """Detects people (and optionally their pose keypoints) in one frame."""
