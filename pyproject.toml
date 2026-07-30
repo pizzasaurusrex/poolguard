@@ -27,6 +27,7 @@ dev = [
 [project.scripts]
 poolguard = "poolguard.main:main"
 poolguard-benchmark = "poolguard.scripts.benchmark_fps:main"
+poolguard-replay = "poolguard.scripts.replay:main"
 
 [build-system]
 requires = ["hatchling"]
