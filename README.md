@@ -36,21 +36,48 @@ If you build this, you accept full responsibility for its use.
 has even arrived. Expect broken states, unproven rules, and revised decisions
 (recorded as ADRs in [docs/architecture.md](docs/architecture.md)).
 
-Currently: pre-hardware. PRD drafted; scaffold only. See [PRD.md](PRD.md) for the full
+Currently: **PD phase — no hardware, everything runs on a dev machine**
+(ADR-010). Pose detection works on video files via the replay CLI below;
+tracking and the rules engine are next. See [PRD.md](PRD.md) for the full
 design, [BOM.md](BOM.md) for the parts list, [PLAN.md](PLAN.md) for current
 progress, and [docs/edge-inference.md](docs/edge-inference.md) for how the
 AI HAT+ / model pipeline works.
 
 ## Development
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/). No Raspberry Pi
+or camera is needed — the whole pipeline runs on a laptop (ADR-010).
 
 ```sh
 uv sync              # core deps + dev tools
 uv run pytest        # tests
 uv run ruff check    # lint
+```
 
-uv sync --extra vision   # adds opencv/ultralytics (needed on the Pi / for benchmarks)
+## Try it: pose detection on a video clip
+
+Install the vision extra (opencv + ultralytics; on Apple Silicon inference
+uses MPS automatically), then replay any video file through the pose
+pipeline:
+
+```sh
+uv sync --extra vision
+uv run poolguard-replay --video path/to/clip.mp4
+```
+
+Output is a summary line (frames, frames with people, detection count,
+throughput); add `--per-frame` to see each frame's detections, or
+`--min-confidence 0.4` to raise the detection threshold. The first run
+downloads the pose model (~6 MB) to the working directory; weights are
+never committed (see License).
+
+Any footage works — a phone video of people walking is enough to see
+detections. Pool clips are what the PD phase collects for rule development.
+
+Other utilities:
+
+```sh
+# P0 bench: measure raw RTSP capture FPS (needs a live stream)
 uv run poolguard-benchmark --rtsp-url rtsp://user:pass@cam/h264Preview_01_main
 ```
 
@@ -60,8 +87,10 @@ uv run poolguard-benchmark --rtsp-url rtsp://user:pass@cam/h264Preview_01_main
 src/poolguard/
   events.py      # immutable Pydantic models passed between pipeline stages
   config.py      # validated runtime settings (env / .env)
-  scripts/       # P0/P1 utilities (FPS benchmark, capture)
-  main.py        # pipeline entry point (P2)
+  replay.py      # offline pipeline loop over a FrameSource (PD test harness)
+  vision/        # frame + pose seams: protocols, video-file source, Ultralytics backend
+  scripts/       # CLI entry points (replay, FPS benchmark)
+  main.py        # live pipeline entry point (later phase)
 tests/
 ```
 
