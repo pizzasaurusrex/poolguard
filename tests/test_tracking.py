@@ -60,18 +60,14 @@ class TestIou:
 
 class TestNewTracks:
     def test_high_confidence_detections_spawn_tracks(self) -> None:
-        state, people = advance(
-            TrackerState(), (det(0.1, 0.1), det(0.6, 0.6)), START, SETTINGS
-        )
+        state, people = advance(TrackerState(), (det(0.1, 0.1), det(0.6, 0.6)), START, SETTINGS)
 
         assert sorted(p.track_id for p in people) == [1, 2]
         assert all(p.seconds_since_last_seen == 0.0 for p in people)
         assert len(state.tracks) == 2
 
     def test_low_confidence_detection_never_spawns(self) -> None:
-        state, people = advance(
-            TrackerState(), (det(0.1, 0.1, confidence=0.2),), START, SETTINGS
-        )
+        state, people = advance(TrackerState(), (det(0.1, 0.1, confidence=0.2),), START, SETTINGS)
 
         assert people == ()
         assert state.tracks == ()
@@ -81,17 +77,13 @@ class TestIdPersistence:
     def test_same_person_keeps_id_across_frames(self) -> None:
         state, _ = advance(TrackerState(), (det(0.1, 0.1),), START, SETTINGS)
         later = START + timedelta(seconds=1)
-        state, people = advance(
-            state, (det(0.12, 0.11, ts=later),), later, SETTINGS
-        )
+        state, people = advance(state, (det(0.12, 0.11, ts=later),), later, SETTINGS)
 
         assert [p.track_id for p in people] == [1]
         assert people[0].seconds_since_last_seen == 0.0
 
     def test_two_people_keep_distinct_ids(self) -> None:
-        state, first = advance(
-            TrackerState(), (det(0.1, 0.1), det(0.6, 0.6)), START, SETTINGS
-        )
+        state, first = advance(TrackerState(), (det(0.1, 0.1), det(0.6, 0.6)), START, SETTINGS)
         by_pos = {round(p.detection.box.x, 1): p.track_id for p in first}
 
         later = START + timedelta(seconds=1)
@@ -111,9 +103,7 @@ class TestIdPersistence:
         # overlaps track 1 (at 0.16) strongly. Track-order matching lets
         # track 0 steal it before track 1 gets a turn; strongest-first must
         # give it to track 1 and leave the 0.09 detection for track 0.
-        state, first = advance(
-            TrackerState(), (det(0.10, 0.1), det(0.16, 0.1)), START, SETTINGS
-        )
+        state, first = advance(TrackerState(), (det(0.10, 0.1), det(0.16, 0.1)), START, SETTINGS)
         ids = {round(p.detection.box.x, 2): p.track_id for p in first}
 
         later = START + timedelta(seconds=1)
@@ -131,9 +121,7 @@ class TestIdPersistence:
     def test_one_detection_cannot_satisfy_two_tracks(self) -> None:
         # Two people converge; only one box comes back. The other track must
         # coast (its timer growing), not silently share the survivor's box.
-        state, _ = advance(
-            TrackerState(), (det(0.10, 0.1), det(0.18, 0.1)), START, SETTINGS
-        )
+        state, _ = advance(TrackerState(), (det(0.10, 0.1), det(0.18, 0.1)), START, SETTINGS)
 
         later = START + timedelta(seconds=1)
         state, people = advance(state, (det(0.14, 0.1, ts=later),), later, SETTINGS)
@@ -156,9 +144,7 @@ class TestLowConfidenceRescue:
         state, _ = advance(TrackerState(), (det(0.1, 0.1),), START, SETTINGS)
         later = START + timedelta(seconds=1)
         # Splashing: same place, confidence collapsed below high threshold.
-        state, people = advance(
-            state, (det(0.11, 0.1, confidence=0.2, ts=later),), later, SETTINGS
-        )
+        state, people = advance(state, (det(0.11, 0.1, confidence=0.2, ts=later),), later, SETTINGS)
 
         assert [p.track_id for p in people] == [1]
         assert people[0].seconds_since_last_seen == 0.0
@@ -185,12 +171,8 @@ class TestCoasting:
 
 class TestInWater:
     def test_zone_membership_by_box_center(self) -> None:
-        settings = SETTINGS.model_copy(
-            update={"pool_zone": (0.0, 0.0, 0.5, 1.0)}
-        )
-        _, people = advance(
-            TrackerState(), (det(0.1, 0.1), det(0.7, 0.1)), START, settings
-        )
+        settings = SETTINGS.model_copy(update={"pool_zone": (0.0, 0.0, 0.5, 1.0)})
+        _, people = advance(TrackerState(), (det(0.1, 0.1), det(0.7, 0.1)), START, settings)
         by_x = {round(p.detection.box.x, 1): p.in_water for p in people}
 
         assert by_x[0.1] is True

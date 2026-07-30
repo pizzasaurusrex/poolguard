@@ -61,19 +61,18 @@ def match_greedy(
     iou_min: float,
 ) -> tuple[tuple[int, int], ...]:
     """Greedily pair tracks with detections by IoU.
-    
+
     Returns (track_index, detection_index) pairs. Each track and each
     detection may appear in at most one pair, and a pair is only valid if
     iou(track.last_detection.box, detection.box) >= iou_min.
     """
-    
+
     candidates = []
     for track_index, track in enumerate(tracks):
         for detection_index, detection in enumerate(detections):
             score = iou(track.last_detection.box, detection.box)
             if score >= iou_min:
                 candidates.append((score, track_index, detection_index))
-
 
     matched = []
 
@@ -83,7 +82,7 @@ def match_greedy(
         if any(detection_index == d for _, d in matched):
             continue
         matched.append((track_index, detection_index))
-      
+
     return tuple(matched)
 
 
@@ -100,9 +99,7 @@ def advance(
     """
     high = tuple(d for d in detections if d.confidence >= settings.high_confidence)
     low = tuple(
-        d
-        for d in detections
-        if settings.low_confidence <= d.confidence < settings.high_confidence
+        d for d in detections if settings.low_confidence <= d.confidence < settings.high_confidence
     )
 
     matched_pairs = match_greedy(state.tracks, high, settings.iou_min)
@@ -110,19 +107,13 @@ def advance(
     matched_high_indices = {d for _, d in matched_pairs}
 
     remaining = tuple(
-        (i, track)
-        for i, track in enumerate(state.tracks)
-        if i not in matched_track_indices
+        (i, track) for i, track in enumerate(state.tracks) if i not in matched_track_indices
     )
-    rescue_pairs = match_greedy(
-        tuple(track for _, track in remaining), low, settings.iou_min
-    )
+    rescue_pairs = match_greedy(tuple(track for _, track in remaining), low, settings.iou_min)
 
     updated: list[Track] = []
     for track_index, detection_index in matched_pairs:
-        updated.append(
-            _touch(state.tracks[track_index], high[detection_index], now)
-        )
+        updated.append(_touch(state.tracks[track_index], high[detection_index], now))
     rescued_track_indices = set()
     for local_index, detection_index in rescue_pairs:
         original_index, track = remaining[local_index]
@@ -141,9 +132,7 @@ def advance(
     for i, detection in enumerate(high):
         if i in matched_high_indices:
             continue
-        spawned.append(
-            Track(track_id=next_id, last_detection=detection, last_seen_ts=now)
-        )
+        spawned.append(Track(track_id=next_id, last_detection=detection, last_seen_ts=now))
         next_id += 1
 
     tracks = tuple(updated) + coasting + tuple(spawned)
@@ -156,9 +145,7 @@ def _touch(track: Track, detection: Detection, now: AwareDatetime) -> Track:
     return Track(track_id=track.track_id, last_detection=detection, last_seen_ts=now)
 
 
-def _to_person(
-    track: Track, now: AwareDatetime, settings: TrackingSettings
-) -> TrackedPerson:
+def _to_person(track: Track, now: AwareDatetime, settings: TrackingSettings) -> TrackedPerson:
     return TrackedPerson(
         track_id=track.track_id,
         detection=track.last_detection,
@@ -171,7 +158,4 @@ def _in_zone(box: BoundingBox, zone: tuple[float, float, float, float]) -> bool:
     center_x = box.x + box.width / 2
     center_y = box.y + box.height / 2
     zone_x, zone_y, zone_width, zone_height = zone
-    return (
-        zone_x <= center_x <= zone_x + zone_width
-        and zone_y <= center_y <= zone_y + zone_height
-    )
+    return zone_x <= center_x <= zone_x + zone_width and zone_y <= center_y <= zone_y + zone_height

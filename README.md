@@ -37,8 +37,8 @@ has even arrived. Expect broken states, unproven rules, and revised decisions
 (recorded as ADRs in [docs/architecture.md](docs/architecture.md)).
 
 Currently: **PD phase — no hardware, everything runs on a dev machine**
-(ADR-010). Pose detection works on video files via the replay CLI below;
-tracking and the rules engine are next. See [PRD.md](PRD.md) for the full
+(ADR-010). Pose detection and tracking work on video files via the replay
+CLI below; the rules engine is next. See [PRD.md](PRD.md) for the full
 design, [BOM.md](BOM.md) for the parts list, [PLAN.md](PLAN.md) for current
 progress, and [docs/edge-inference.md](docs/edge-inference.md) for how the
 AI HAT+ / model pipeline works.
@@ -74,6 +74,28 @@ never committed (see License).
 Any footage works — a phone video of people walking is enough to see
 detections. Pool clips are what the PD phase collects for rule development.
 
+## Try it: tracking and annotated replay
+
+Add `--track` to run detections through the tracking stage (persistent IDs,
+low-confidence "rescue" matching, coasting through brief detector dropouts):
+
+```sh
+uv run poolguard-replay --video path/to/clip.mp4 --track --per-frame
+```
+
+Add `--render out.mp4` (implies `--track`) to write an annotated video
+instead — colored box per track ID, a distinct "ghost box" with an elapsed
+timer for tracks the detector has temporarily lost, and the configured pool
+zone outline:
+
+```sh
+uv run poolguard-replay --video path/to/clip.mp4 --render out.mp4
+```
+
+This is the primary debugging tool for tracker behavior — watch the ghost
+box hold a person's identity through a splash or brief occlusion instead of
+inferring it from log lines.
+
 Other utilities:
 
 ```sh
@@ -87,8 +109,10 @@ uv run poolguard-benchmark --rtsp-url rtsp://user:pass@cam/h264Preview_01_main
 src/poolguard/
   events.py      # immutable Pydantic models passed between pipeline stages
   config.py      # validated runtime settings (env / .env)
+  tracking.py    # two-pass IoU tracker: Detections -> persistent TrackedPerson tracks
   replay.py      # offline pipeline loop over a FrameSource (PD test harness)
-  vision/        # frame + pose seams: protocols, video-file source, Ultralytics backend
+  vision/        # frame + pose seams: protocols, video-file source, Ultralytics backend,
+                 # annotated-replay renderer
   scripts/       # CLI entry points (replay, FPS benchmark)
   main.py        # live pipeline entry point (later phase)
 tests/

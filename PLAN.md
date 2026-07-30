@@ -13,7 +13,14 @@ ordered only when the P0 bench question (Hailo FPS) is the last one open.
 - Repo public on GitHub (building in public): MIT license, safety disclaimer,
   secret scanning + push protection, Dependabot, main-branch ruleset.
 - Python 3.12 + uv, src layout, frozen Pydantic event/config models, FPS
-  benchmark script, tests for events and config (14 tests).
+  benchmark script, tests for events and config.
+- Vision seam (`PoseEstimator`/`FrameSource` protocols, Ultralytics dev
+  backend) and replay CLI (`poolguard-replay`) landed — PR 2, PR 3.
+- Tracking stage landed (PR 5): custom two-pass IoU tracker (`tracking.py`),
+  `--track` flag; see [CLAUDE.md Decisions](CLAUDE.md#decisions) 2026-07-30.
+- Annotated replay rendering (PR 6, open): `--render` flag draws per-track
+  colored boxes and a "ghost box" for coasting tracks — the primary
+  debugging tool for tracker behavior on labeled clips.
 - **No hardware purchased. Hardware order is deliberately deferred (ADR-010)**
   until PD exit criteria are met.
 

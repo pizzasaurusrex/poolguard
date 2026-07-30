@@ -18,9 +18,7 @@ WIDTH, HEIGHT = 64, 48
 @pytest.fixture
 def video_path(tmp_path: Path) -> Path:
     path = tmp_path / "clip.mp4"
-    writer = cv2.VideoWriter(
-        str(path), cv2.VideoWriter_fourcc(*"mp4v"), FPS, (WIDTH, HEIGHT)
-    )
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), FPS, (WIDTH, HEIGHT))
     assert writer.isOpened()
     for i in range(FRAME_COUNT):
         image = np.full((HEIGHT, WIDTH, 3), i * 10, dtype=np.uint8)

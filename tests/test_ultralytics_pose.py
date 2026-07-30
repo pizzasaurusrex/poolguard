@@ -63,36 +63,26 @@ def frame() -> Frame:
     return Frame(image=np.zeros((100, 200, 3), dtype=np.uint8), ts=TS, index=0)
 
 
-def make_estimator(
-    monkeypatch: pytest.MonkeyPatch, result: FakeResult
-) -> UltralyticsPoseEstimator:
+def make_estimator(monkeypatch: pytest.MonkeyPatch, result: FakeResult) -> UltralyticsPoseEstimator:
     fake = FakeYOLO(result)
-    monkeypatch.setattr(
-        "poolguard.vision.ultralytics_pose.YOLO", lambda model: fake
-    )
+    monkeypatch.setattr("poolguard.vision.ultralytics_pose.YOLO", lambda model: fake)
     return UltralyticsPoseEstimator()
 
 
-def test_no_boxes_yields_no_detections(
-    monkeypatch: pytest.MonkeyPatch, frame: Frame
-) -> None:
+def test_no_boxes_yields_no_detections(monkeypatch: pytest.MonkeyPatch, frame: Frame) -> None:
     estimator = make_estimator(monkeypatch, FakeResult(boxes=None, keypoints=None))
 
     assert estimator.estimate(frame) == ()
 
 
-def test_empty_boxes_yields_no_detections(
-    monkeypatch: pytest.MonkeyPatch, frame: Frame
-) -> None:
+def test_empty_boxes_yields_no_detections(monkeypatch: pytest.MonkeyPatch, frame: Frame) -> None:
     boxes = FakeBoxes(np.zeros((0, 4)), np.zeros((0,)))
     estimator = make_estimator(monkeypatch, FakeResult(boxes=boxes, keypoints=None))
 
     assert estimator.estimate(frame) == ()
 
 
-def test_boxes_and_keypoints_are_converted(
-    monkeypatch: pytest.MonkeyPatch, frame: Frame
-) -> None:
+def test_boxes_and_keypoints_are_converted(monkeypatch: pytest.MonkeyPatch, frame: Frame) -> None:
     boxes = FakeBoxes(np.array([[20.0, 10.0, 120.0, 60.0]]), np.array([0.9]))
     keypoints = FakeKeypoints(np.full((1, 17, 3), 50.0))
     estimator = make_estimator(monkeypatch, FakeResult(boxes=boxes, keypoints=keypoints))
