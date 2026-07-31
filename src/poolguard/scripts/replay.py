@@ -8,6 +8,10 @@ Requires the `vision` extra: uv sync --extra vision
 
 import argparse
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from poolguard.labels import ShotLabel
 
 try:
     from poolguard.vision.ultralytics_pose import DEFAULT_MODEL, UltralyticsPoseEstimator
@@ -26,6 +30,22 @@ def _describe(person: TrackedPerson) -> str:
     return f"#{person.track_id}{suffix}"
 
 
+def _find_label(args: argparse.Namespace) -> "ShotLabel | None":
+    """Look up the manifest entry whose shot name matches the replayed file."""
+    if not args.labels:
+        return None
+    from pathlib import Path
+
+    from poolguard.labels import load_shot_labels
+
+    wanted = Path(args.video).name
+    for shot in load_shot_labels(Path(args.labels)).shots:
+        if shot.shot == wanted:
+            return shot
+    print(f"warning: no label for {wanted} in {args.labels}; rendering without expectations")
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a video through pose detection.")
     parser.add_argument("--video", required=True, help="path to a video file")
@@ -35,6 +55,11 @@ def main() -> None:
     parser.add_argument("--track", action="store_true", help="run the tracking stage")
     parser.add_argument(
         "--render", metavar="OUT_MP4", help="write an annotated video (implies --track)"
+    )
+    parser.add_argument(
+        "--labels",
+        metavar="SHOTS_YAML",
+        help="shot manifest; the entry matching --video adds its expected event to the overlay",
     )
     args = parser.parse_args()
     if args.render:
@@ -52,7 +77,9 @@ def main() -> None:
         if args.render:
             from poolguard.vision.render import render_tracked_replay
 
-            tracked_results = render_tracked_replay(source, estimator, settings, args.render)
+            tracked_results = render_tracked_replay(
+                source, estimator, settings, args.render, label=_find_label(args)
+            )
         else:
             tracked_results = run_tracked_replay(source, estimator, settings)
         for tracked in tracked_results:

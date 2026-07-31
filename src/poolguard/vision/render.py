@@ -13,10 +13,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from poolguard.config import TrackingSettings
+from poolguard.config import RulesSettings, TrackingSettings
 from poolguard.events import TrackedPerson
+from poolguard.labels import ShotLabel
 from poolguard.replay import TrackedFrameResult, run_tracked_replay
 from poolguard.vision.frames import Frame, FrameSource
+from poolguard.vision.hud import HudState, draw_hud
 from poolguard.vision.pose import PoseEstimator
 
 FALLBACK_FPS = 15.0
@@ -119,11 +121,36 @@ def _draw_coasting(
     )
 
 
+def _hud_state(
+    result: TrackedFrameResult,
+    start_ts: object,
+    frames_seen: int,
+    frames_with_detections: int,
+    label: ShotLabel | None,
+    rules: RulesSettings,
+) -> HudState:
+    live = tuple(p for p in result.people if p.seconds_since_last_seen == 0.0)
+    coasting = tuple(p for p in result.people if p.seconds_since_last_seen > 0.0)
+    return HudState(
+        frame_index=result.frame_index,
+        elapsed_seconds=(result.ts - start_ts).total_seconds(),  # type: ignore[operator]
+        live_tracks=len(live),
+        coasting_tracks=len(coasting),
+        longest_unseen_seconds=max((p.seconds_since_last_seen for p in coasting), default=0.0),
+        detection_rate=frames_with_detections / max(frames_seen, 1),
+        expected_event=label.expected_event.value if label and label.expected_event else None,
+        onset_window=label.onset_window if label else None,
+        submersion_timeout_seconds=rules.submersion_timeout_seconds,
+    )
+
+
 def render_tracked_replay(
     source: FrameSource,
     estimator: PoseEstimator,
     settings: TrackingSettings,
     out_path: str | Path,
+    label: ShotLabel | None = None,
+    rules: RulesSettings | None = None,
 ) -> Iterator[TrackedFrameResult]:
     """run_tracked_replay that also writes an annotated video as it goes.
 
@@ -135,6 +162,10 @@ def render_tracked_replay(
     writer: cv2.VideoWriter | None = None
     pending: tuple[np.ndarray, TrackedFrameResult] | None = None
     previous_ts = None
+    rules = rules or RulesSettings()
+    start_ts = None
+    frames_seen = 0
+    frames_with_detections = 0
 
     def open_writer(canvas: np.ndarray, fps: float) -> cv2.VideoWriter:
         height, width = canvas.shape[:2]
@@ -146,7 +177,16 @@ def render_tracked_replay(
 
     try:
         for frame, result in _tracked_frames(source, estimator, settings):
+            if start_ts is None:
+                start_ts = result.ts
+            frames_seen += 1
+            if result.detections:
+                frames_with_detections += 1
             canvas = annotate_frame(frame.image, result.people, settings.pool_zone)
+            canvas = draw_hud(
+                canvas,
+                _hud_state(result, start_ts, frames_seen, frames_with_detections, label, rules),
+            )
             if writer is None:
                 if pending is None:
                     pending = (canvas, result)
