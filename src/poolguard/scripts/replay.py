@@ -50,7 +50,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a video through pose detection.")
     parser.add_argument("--video", required=True, help="path to a video file")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="ultralytics pose model")
-    parser.add_argument("--min-confidence", type=float, default=0.25)
+    parser.add_argument(
+        "--min-confidence",
+        type=float,
+        default=None,
+        help="detection floor; defaults to the tracker's low_confidence",
+    )
     parser.add_argument("--per-frame", action="store_true", help="print each frame's detections")
     parser.add_argument("--track", action="store_true", help="run the tracking stage")
     parser.add_argument(
@@ -65,15 +70,19 @@ def main() -> None:
     if args.render:
         args.track = True
 
+    settings = TrackingSettings()
+    min_confidence = (
+        args.min_confidence if args.min_confidence is not None else settings.low_confidence
+    )
+
     source = VideoFileFrameSource(args.video)
-    estimator = UltralyticsPoseEstimator(model=args.model, min_confidence=args.min_confidence)
+    estimator = UltralyticsPoseEstimator(model=args.model, min_confidence=min_confidence)
 
     summary = ReplaySummary()
     track_ids: set[int] = set()
     start = time.monotonic()
 
     if args.track:
-        settings = TrackingSettings()
         if args.render:
             from poolguard.vision.render import render_tracked_replay
 

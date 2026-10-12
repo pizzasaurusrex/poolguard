@@ -11,8 +11,12 @@ import pytest
 
 pytest.importorskip("ultralytics")
 
+from poolguard.config import TrackingSettings  # noqa: E402
 from poolguard.vision.frames import Frame  # noqa: E402
-from poolguard.vision.ultralytics_pose import UltralyticsPoseEstimator  # noqa: E402
+from poolguard.vision.ultralytics_pose import (  # noqa: E402
+    DEFAULT_MIN_CONFIDENCE,
+    UltralyticsPoseEstimator,
+)
 
 TS = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -106,3 +110,19 @@ def test_detection_only_result_has_no_keypoints(
 
     assert len(detections) == 1
     assert detections[0].keypoints is None
+
+
+def test_default_floor_lets_the_whole_rescue_band_through(
+    monkeypatch: pytest.MonkeyPatch, frame: Frame
+) -> None:
+    """The tracker's rescue pass needs every detection down to low_confidence.
+
+    A higher floor here silently discards the bottom of that band before the
+    tracker can use it.
+    """
+    estimator = make_estimator(monkeypatch, FakeResult(boxes=None, keypoints=None))
+
+    estimator.estimate(frame)
+
+    assert TrackingSettings(_env_file=None).low_confidence == DEFAULT_MIN_CONFIDENCE
+    assert estimator._model.predict_kwargs["conf"] == DEFAULT_MIN_CONFIDENCE

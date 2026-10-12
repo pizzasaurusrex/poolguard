@@ -15,12 +15,16 @@ from poolguard.vision.pose import detections_from_arrays
 
 DEFAULT_MODEL = "yolo11n-pose.pt"
 
+DEFAULT_MIN_CONFIDENCE = 0.1
+"""Matches TrackingSettings.low_confidence: the tracker's rescue pass uses weak
+detections down to that floor, so filtering higher here hides them from it."""
+
 
 class UltralyticsPoseEstimator:
     def __init__(
         self,
         model: str | Path = DEFAULT_MODEL,
-        min_confidence: float = 0.25,
+        min_confidence: float = DEFAULT_MIN_CONFIDENCE,
         device: str | None = None,
     ) -> None:
         self._model = YOLO(model)

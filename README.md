@@ -102,7 +102,8 @@ uv run poolguard-replay --video path/to/clip.mp4
 
 Output is a summary line (frames, frames with people, detection count,
 throughput); add `--per-frame` to see each frame's detections, or
-`--min-confidence 0.4` to raise the detection threshold. The first run
+`--min-confidence 0.4` to raise the detection floor (it defaults to the
+tracker's `low_confidence`, 0.1, so weak detections reach the rescue pass). The first run
 downloads the pose model (~6 MB) to the working directory; weights are
 never committed (see License).
 
