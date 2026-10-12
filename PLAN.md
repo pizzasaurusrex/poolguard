@@ -17,7 +17,7 @@ ordered only when the P0 bench question (Hailo FPS) is the last one open.
 - Vision seam (`PoseEstimator`/`FrameSource` protocols, Ultralytics dev
   backend) and replay CLI (`poolguard-replay`) landed — PR 2, PR 3.
 - Tracking stage landed (PR 5): custom two-pass IoU tracker (`tracking.py`),
-  `--track` flag; see [CLAUDE.md Decisions](CLAUDE.md#decisions) 2026-07-30.
+  `--track` flag; see the [decision log](docs/decision-log.md) 2026-07-30.
 - Annotated replay rendering (PR 6, open): `--render` flag draws per-track
   colored boxes and a "ghost box" for coasting tracks — the primary
   debugging tool for tracker behavior on labeled clips.
