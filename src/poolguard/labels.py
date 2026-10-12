@@ -23,9 +23,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from poolguard.events import EventType
-
-MIN_POLYGON_POINTS = 3
-"""Fewest vertices that enclose an area; below this there is no inside."""
+from poolguard.geometry import Polygon, validate_polygon
 
 MIN_ONSET_WINDOW_SECONDS = 0.1
 """Narrowest onset window a label may claim.
@@ -47,7 +45,7 @@ class CameraProfile(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    water_polygon: tuple[tuple[float, float], ...] = Field(
+    water_polygon: Polygon = Field(
         description="Waterline as normalized (x, y) vertices, clockwise from any start. "
         "A polygon rather than a rect because real pools are not rectangular — the "
         "bounding box of a kidney pool is roughly a third deck, which is exactly where "
@@ -65,14 +63,7 @@ class CameraProfile(BaseModel):
 
     @model_validator(mode="after")
     def _polygon_encloses_an_area(self) -> "CameraProfile":
-        if len(self.water_polygon) < MIN_POLYGON_POINTS:
-            raise ValueError(
-                f"water_polygon needs at least {MIN_POLYGON_POINTS} vertices, "
-                f"got {len(self.water_polygon)}"
-            )
-        for x, y in self.water_polygon:
-            if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
-                raise ValueError(f"water_polygon vertex out of normalized range: {(x, y)}")
+        validate_polygon(self.water_polygon, name="water_polygon")
         return self
 
     @property

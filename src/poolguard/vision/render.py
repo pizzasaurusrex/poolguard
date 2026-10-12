@@ -16,6 +16,7 @@ import numpy as np
 
 from poolguard.config import RulesSettings, TrackingSettings
 from poolguard.events import TrackedPerson
+from poolguard.geometry import Polygon
 from poolguard.replay import TrackedFrameResult, run_tracked_replay
 from poolguard.vision.frames import Frame, FrameSource
 from poolguard.vision.hud import HudState, draw_hud
@@ -49,20 +50,16 @@ def color_for_track(track_id: int) -> tuple[int, int, int]:
 def annotate_frame(
     image: np.ndarray,
     people: tuple[TrackedPerson, ...],
-    pool_zone: tuple[float, float, float, float],
+    pool_zone: Polygon,
 ) -> np.ndarray:
     """Return a copy of the frame with the tracker's view drawn on it."""
     canvas = image.copy()
     height, width = canvas.shape[:2]
 
-    zone_x, zone_y, zone_w, zone_h = pool_zone
-    cv2.rectangle(
-        canvas,
-        (int(zone_x * width), int(zone_y * height)),
-        (int((zone_x + zone_w) * width), int((zone_y + zone_h) * height)),
-        _ZONE_COLOR,
-        1,
+    zone_pixels = np.array(
+        [(int(x * width), int(y * height)) for x, y in pool_zone], dtype=np.int32
     )
+    cv2.polylines(canvas, [zone_pixels], isClosed=True, color=_ZONE_COLOR, thickness=1)
 
     for person in people:
         box = person.detection.box

@@ -81,13 +81,13 @@ Work happens in reviewable PRs against `main`.
         `imgsz` 640 / 1280 / 1920. Tiled inference was benchmarked and
         rejected for now (gains were mostly shadow false positives). See the
         [decision log](docs/decision-log.md).
-- [ ] Inference near native resolution: expose input size on the Ultralytics
-      backend and the replay CLI, and crop to the camera profile's
-      `crop_rect` — currently the pipeline always runs at 640
-- [~] Per-clip `pool_zone` — polygon zones now live in named camera profiles
-      in the label manifest (PR 8), but the tracker still reads the rect in
-      `TrackingSettings`, whose default is the whole frame, so `in_water` is
-      still true for people on the deck
+- [~] Inference near native resolution: the Ultralytics backend now runs at
+      the frame's own size, capped at 1920 (`--max-inference-size` on the
+      replay CLI). Still open: crop to the camera profile's `crop_rect`
+- [x] Per-clip `pool_zone` — `TrackingSettings.pool_zone` is a polygon and
+      `in_water` is a point-in-polygon test; `poolguard-replay --labels`
+      applies the shot's camera profile. Not yet checked against real
+      backyard footage
 - [ ] Local RTSP loop via mediamtx to exercise ingest/reconnect path
 - [ ] PagerDuty Free signup + escalation drill — resolves ADR-006's named
       condition (voice calls on free tier?) with zero hardware

@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from poolguard.config import TrackingSettings
 from poolguard.events import BoundingBox, Detection
+from poolguard.geometry import WHOLE_FRAME
 from poolguard.tracking import TrackerState, advance, containment, iou
 
 START = datetime(2026, 1, 1, tzinfo=UTC)
@@ -22,7 +23,7 @@ SETTINGS = TrackingSettings(
     low_confidence=0.1,
     iou_min=0.3,
     max_coast_seconds=30.0,
-    pool_zone=(0.0, 0.0, 1.0, 1.0),
+    pool_zone=WHOLE_FRAME,
 )
 
 
@@ -241,12 +242,25 @@ class TestCoasting:
 
 class TestInWater:
     def test_zone_membership_by_box_center(self) -> None:
-        settings = SETTINGS.model_copy(update={"pool_zone": (0.0, 0.0, 0.5, 1.0)})
+        left_half = ((0.0, 0.0), (0.5, 0.0), (0.5, 1.0), (0.0, 1.0))
+        settings = SETTINGS.model_copy(update={"pool_zone": left_half})
         _, people = advance(TrackerState(), (det(0.1, 0.1), det(0.7, 0.1)), START, settings)
         by_x = {round(p.detection.box.x, 1): p.in_water for p in people}
 
         assert by_x[0.1] is True
         assert by_x[0.7] is False
+
+    def test_person_on_deck_inside_the_zone_bounding_box_is_not_in_water(self) -> None:
+        """The reason the zone is a polygon: a kidney pool's bounding box is part deck."""
+        l_shaped_pool = ((0.0, 0.0), (0.5, 0.0), (0.5, 0.5), (1.0, 0.5), (1.0, 1.0), (0.0, 1.0))
+        settings = SETTINGS.model_copy(update={"pool_zone": l_shaped_pool})
+        on_deck = det(0.7, 0.15)  # centre (0.75, 0.25): in the notch
+        swimming = det(0.2, 0.15)  # centre (0.25, 0.25): in the left arm
+        _, people = advance(TrackerState(), (on_deck, swimming), START, settings)
+        by_x = {round(p.detection.box.x, 1): p.in_water for p in people}
+
+        assert by_x[0.7] is False
+        assert by_x[0.2] is True
 
 
 class TestImmutability:

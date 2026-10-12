@@ -60,22 +60,28 @@ class TestTrackingSettingsValidation:
         settings = TrackingSettings(high_confidence=0.5, low_confidence=0.5)
         assert settings.low_confidence == settings.high_confidence
 
-    def test_pool_zone_origin_outside_frame_rejected(self) -> None:
+    def test_pool_zone_vertex_outside_frame_rejected(self) -> None:
         with pytest.raises(ValidationError, match="pool_zone"):
-            TrackingSettings(pool_zone=(-0.1, 0.0, 1.0, 1.0))
+            TrackingSettings(pool_zone=((-0.1, 0.0), (1.0, 0.0), (1.0, 1.0)))
 
-    def test_pool_zone_zero_size_rejected(self) -> None:
-        # A zero-width zone makes in_water always False — the silent
+    def test_pool_zone_with_no_area_rejected(self) -> None:
+        # A zone enclosing nothing makes in_water always False — the silent
         # failure mode that would disable the submersion rule.
         with pytest.raises(ValidationError, match="pool_zone"):
-            TrackingSettings(pool_zone=(0.2, 0.2, 0.0, 0.5))
+            TrackingSettings(pool_zone=((0.2, 0.2), (0.5, 0.2), (0.8, 0.2)))
 
-    def test_pool_zone_oversized_component_rejected(self) -> None:
+    def test_pool_zone_needs_three_vertices(self) -> None:
         with pytest.raises(ValidationError, match="pool_zone"):
-            TrackingSettings(pool_zone=(0.0, 0.0, 1.5, 1.0))
+            TrackingSettings(pool_zone=((0.0, 0.0), (1.0, 1.0)))
 
-    def test_default_pool_zone_still_valid(self) -> None:
-        assert TrackingSettings().pool_zone == (0.0, 0.0, 1.0, 1.0)
+    def test_default_pool_zone_is_the_whole_frame(self) -> None:
+        assert TrackingSettings().pool_zone == ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
+
+    def test_pool_zone_reads_a_json_polygon_from_the_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("POOLGUARD_TRACKING_POOL_ZONE", "[[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]]")
+        assert TrackingSettings().pool_zone == ((0.1, 0.1), (0.9, 0.1), (0.5, 0.9))
 
 
 def test_settings_are_frozen(camera_env: None) -> None:

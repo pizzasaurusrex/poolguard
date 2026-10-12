@@ -13,6 +13,7 @@ cv2 = pytest.importorskip("cv2")
 
 from poolguard.config import TrackingSettings  # noqa: E402
 from poolguard.events import BoundingBox, Detection, TrackedPerson  # noqa: E402
+from poolguard.geometry import WHOLE_FRAME  # noqa: E402
 from poolguard.vision.frames import Frame  # noqa: E402
 from poolguard.vision.render import (  # noqa: E402
     annotate_frame,
@@ -46,24 +47,24 @@ class TestAnnotateFrame:
         image = blank_image()
         image.setflags(write=False)  # Frame images are read-only in the pipeline
 
-        canvas = annotate_frame(image, (person(1),), pool_zone=(0, 0, 1, 1))
+        canvas = annotate_frame(image, (person(1),), pool_zone=WHOLE_FRAME)
 
         assert canvas is not image
         assert not image.any()  # input still all-black
 
     def test_live_person_is_drawn(self) -> None:
-        canvas = annotate_frame(blank_image(), (person(1),), pool_zone=(0, 0, 1, 1))
+        canvas = annotate_frame(blank_image(), (person(1),), pool_zone=WHOLE_FRAME)
 
         assert canvas.any()  # something was drawn
 
     def test_coasting_person_is_drawn(self) -> None:
-        canvas = annotate_frame(blank_image(), (person(1, unseen=4.2),), pool_zone=(0, 0, 1, 1))
+        canvas = annotate_frame(blank_image(), (person(1, unseen=4.2),), pool_zone=WHOLE_FRAME)
 
         assert canvas.any()
 
     def test_coasting_looks_different_from_live(self) -> None:
-        live = annotate_frame(blank_image(), (person(1),), pool_zone=(0, 0, 1, 1))
-        ghost = annotate_frame(blank_image(), (person(1, unseen=4.2),), pool_zone=(0, 0, 1, 1))
+        live = annotate_frame(blank_image(), (person(1),), pool_zone=WHOLE_FRAME)
+        ghost = annotate_frame(blank_image(), (person(1, unseen=4.2),), pool_zone=WHOLE_FRAME)
 
         assert (live != ghost).any()
 
@@ -137,3 +138,11 @@ def test_importing_render_does_not_need_pyyaml(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.delitem(sys.modules, "poolguard.vision.render", raising=False)
 
     importlib.import_module("poolguard.vision.render")
+
+
+def test_pool_zone_outline_is_drawn() -> None:
+    triangle = ((0.1, 0.1), (0.9, 0.1), (0.5, 0.9))
+
+    canvas = annotate_frame(blank_image(), (), pool_zone=triangle)
+
+    assert canvas.any()
