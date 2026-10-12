@@ -4,6 +4,8 @@ The nested-BaseSettings composition previously dropped the documented
 POOLGUARD_CAMERA_* env vars when constructing the top-level Settings.
 """
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -82,3 +84,41 @@ def test_settings_are_frozen(camera_env: None) -> None:
         settings.rules = settings.rules  # type: ignore[misc]
     with pytest.raises(ValidationError):
         settings.rules.default_mode = OperatingMode.SWIM  # type: ignore[misc]
+
+
+def test_alert_urls_are_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Topic and push URLs are credentials, so they must not show up in a repr or log."""
+    monkeypatch.setenv("POOLGUARD_CAMERA_RTSP_URL", "rtsp://cam/stream")
+    monkeypatch.setenv("POOLGUARD_ALERT_NTFY_TOPIC_URL", "https://ntfy.example/secret-topic")
+    monkeypatch.setenv("POOLGUARD_ALERT_HEARTBEAT_PUSH_URL", "http://kuma.example/api/push/tok")
+
+    alerts = Settings(_env_file=None).alerts
+
+    assert "secret-topic" not in repr(alerts)
+    assert "tok" not in repr(alerts.heartbeat_push_url)
+    assert alerts.ntfy_topic_url is not None
+    assert alerts.ntfy_topic_url.get_secret_value() == "https://ntfy.example/secret-topic"
+    assert alerts.heartbeat_interval_seconds == 30.0
+
+
+def test_nested_sections_read_the_dotenv_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A .env file must reach every section, not only the top-level Settings.
+
+    Each section is its own BaseSettings, so an env_file declared on the
+    parent alone is never consulted when a section constructs itself.
+    """
+    monkeypatch.delenv("POOLGUARD_CAMERA_RTSP_URL", raising=False)
+    (tmp_path / ".env").write_text(
+        "POOLGUARD_CAMERA_RTSP_URL=rtsp://cam/from-dotenv\n"
+        "POOLGUARD_ALERT_NTFY_TOPIC_URL=https://ntfy.example/from-dotenv\n"
+        "UNRELATED_TOOL_SETTING=1\n"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    settings = Settings()
+
+    assert settings.camera.rtsp_url.get_secret_value() == "rtsp://cam/from-dotenv"
+    assert settings.alerts.ntfy_topic_url is not None
+    assert settings.alerts.ntfy_topic_url.get_secret_value() == "https://ntfy.example/from-dotenv"

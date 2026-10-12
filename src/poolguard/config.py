@@ -14,9 +14,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from poolguard.events import OperatingMode
 
+ENV_FILE = ".env"
+
+# Every section declares the env file itself: each is its own BaseSettings, so
+# one declared only on the top-level Settings is never read by a section.
+# extra="ignore" because a shared .env also holds the other sections' keys.
+_SECTION_CONFIG = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", frozen=True)
+
 
 class CameraSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="POOLGUARD_CAMERA_", frozen=True)
+    model_config = SettingsConfigDict(env_prefix="POOLGUARD_CAMERA_", **_SECTION_CONFIG)
 
     rtsp_url: SecretStr = Field(
         description="RTSP stream URL, e.g. rtsp://user:pass@host:554/h264Preview_01_main"
@@ -25,7 +32,7 @@ class CameraSettings(BaseSettings):
 
 
 class TrackingSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="POOLGUARD_TRACKING_", frozen=True)
+    model_config = SettingsConfigDict(env_prefix="POOLGUARD_TRACKING_", **_SECTION_CONFIG)
 
     high_confidence: float = Field(
         default=0.5,
@@ -77,7 +84,7 @@ class TrackingSettings(BaseSettings):
 
 
 class RulesSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="POOLGUARD_RULES_", frozen=True)
+    model_config = SettingsConfigDict(env_prefix="POOLGUARD_RULES_", **_SECTION_CONFIG)
 
     distress_sustained_seconds: float = Field(default=5.0, gt=0)
     submersion_timeout_seconds: float = Field(
@@ -93,18 +100,32 @@ class RulesSettings(BaseSettings):
 
 
 class AlertSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="POOLGUARD_ALERT_", frozen=True)
+    model_config = SettingsConfigDict(env_prefix="POOLGUARD_ALERT_", **_SECTION_CONFIG)
 
     siren_gpio_pin: int | None = Field(
         default=None, description="BCM pin driving the siren relay; None disables"
     )
-    ntfy_topic_url: str | None = None
+    ntfy_topic_url: SecretStr | None = Field(
+        default=None,
+        description="Full ntfy topic URL. The topic name is the only secret, so it is "
+        "never logged; None disables the push channel",
+    )
+    heartbeat_push_url: SecretStr | None = Field(
+        default=None,
+        description="Uptime Kuma push-monitor URL, token included; None disables the heartbeat",
+    )
+    heartbeat_interval_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        description="Seconds between pings. Keep it under the monitor's own heartbeat "
+        "interval so one late ping does not read as an outage",
+    )
     mqtt_host: str | None = None
     escalation_ack_timeout_seconds: float = Field(default=30.0, gt=0)
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", frozen=True)
+    model_config = SettingsConfigDict(**_SECTION_CONFIG)
 
     camera: CameraSettings = Field(default_factory=CameraSettings)
     tracking: TrackingSettings = Field(default_factory=TrackingSettings)
