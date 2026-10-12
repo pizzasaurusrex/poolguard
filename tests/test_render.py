@@ -1,5 +1,7 @@
 """Tests for the annotated-replay renderer (vision extra)."""
 
+import importlib
+import sys
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -126,3 +128,12 @@ def test_render_tracked_replay_raises_if_writer_cannot_open(tmp_path: Path) -> N
                 ListFrameSource(frames), OnePersonEstimator(), TrackingSettings(), out
             )
         )
+
+
+def test_importing_render_does_not_need_pyyaml(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rendering only uses ShotLabel as a type; PyYAML is not a vision dependency."""
+    monkeypatch.setitem(sys.modules, "yaml", None)  # makes `import yaml` raise ImportError
+    monkeypatch.delitem(sys.modules, "poolguard.labels", raising=False)
+    monkeypatch.delitem(sys.modules, "poolguard.vision.render", raising=False)
+
+    importlib.import_module("poolguard.vision.render")

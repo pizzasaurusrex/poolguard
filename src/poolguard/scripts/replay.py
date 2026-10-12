@@ -4,6 +4,7 @@ Usage:
     poolguard-replay --video clips/swim.mp4 [--model yolo11n-pose.pt] [--per-frame]
 
 Requires the `vision` extra: uv sync --extra vision
+(--labels also needs the `labels` extra: uv sync --extra vision --extra labels)
 """
 
 import argparse
@@ -36,7 +37,10 @@ def _find_label(args: argparse.Namespace) -> "ShotLabel | None":
         return None
     from pathlib import Path
 
-    from poolguard.labels import load_shot_labels
+    try:
+        from poolguard.labels import load_shot_labels
+    except ImportError as exc:
+        raise SystemExit("--labels needs PyYAML — run: uv sync --extra labels") from exc
 
     wanted = Path(args.video).name
     for shot in load_shot_labels(Path(args.labels)).shots:
