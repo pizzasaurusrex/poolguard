@@ -5,7 +5,7 @@ defined in [PRD.md §10](PRD.md#10-phases). Sequencing changed 2026-07-29
 (ADR-010): software is built and tested on a dev machine first; hardware is
 ordered only when the P0 bench question (Hailo FPS) is the last one open.
 
-## Current state (2026-07-29)
+## Current state (2026-10-11)
 
 - PRD drafted (PRD.md), BOM with links (BOM.md), POC BOM (POC-BOM.md).
 - Architecture doc with ADRs (docs/architecture.md) — 001–007, 010 accepted;
@@ -15,12 +15,22 @@ ordered only when the P0 bench question (Hailo FPS) is the last one open.
 - Python 3.12 + uv, src layout, frozen Pydantic event/config models, FPS
   benchmark script, tests for events and config.
 - Vision seam (`PoseEstimator`/`FrameSource` protocols, Ultralytics dev
-  backend) and replay CLI (`poolguard-replay`) landed — PR 2, PR 3.
+  backend) and replay CLI (`poolguard-replay`) landed — PR 2, PR 4.
 - Tracking stage landed (PR 5): custom two-pass IoU tracker (`tracking.py`),
   `--track` flag; see the [decision log](docs/decision-log.md) 2026-07-30.
-- Annotated replay rendering (PR 6, open): `--render` flag draws per-track
+- Annotated replay rendering (PR 6): `--render` flag draws per-track
   colored boxes and a "ghost box" for coasting tracks — the primary
   debugging tool for tracker behavior on labeled clips.
+- Labeled regression suite, replay HUD and camera profiles landed (PR 8):
+  9 shots labeled in `tests/labels/shots.yaml`, tracker assertions active.
+- First alert channels landed (PR 9): ntfy push and Uptime Kuma heartbeat
+  under `alerts/`, plus `poolguard-alert-test`. Nothing drives them from a
+  live pipeline yet.
+- Decision history moved out of CLAUDE.md into
+  [docs/decision-log.md](docs/decision-log.md) (PR 10).
+- First real footage from the backyard camera (2026-08-25) showed input
+  resolution is the dominant detection variable: 0% of frames at the default
+  640 px input, 87% at 1920. Not yet wired into the pipeline.
 - **No hardware purchased. Hardware order is deliberately deferred (ADR-010)**
   until PD exit criteria are met.
 
@@ -28,9 +38,9 @@ ordered only when the P0 bench question (Hailo FPS) is the last one open.
 
 Work happens in reviewable PRs against `main`.
 
-- [ ] Vision seam: `PoseEstimator` protocol + Ultralytics dev backend,
+- [x] Vision seam: `PoseEstimator` protocol + Ultralytics dev backend,
       `FrameSource` protocol + video-file source (PR 2)
-- [ ] Replay CLI: video file → pose → detection stream (PR 3)
+- [x] Replay CLI: video file → pose → detection stream (PR 4)
 - [ ] Test footage: collect public/self-shot pool clips; staged dry-land
       "distress" clip for rule smoke tests
 - [x] Tracking (ByteTrack-style two-pass IoU, custom) over pose detections —
@@ -66,8 +76,18 @@ Work happens in reviewable PRs against `main`.
       before more rules work: a swimmer-specific detector, plain person
       detection (box only, no pose) as a fallback when keypoints fail, or
       background subtraction / motion as a water-disturbance signal.
-- [ ] Per-clip `pool_zone` — the default zone is the whole frame, so
-      `in_water` is currently true for people on the deck
+      - **Found 2026-08-25: input resolution matters more than the water.**
+        On 1080p backyard footage, detection goes 0% → 66% → 87% of frames at
+        `imgsz` 640 / 1280 / 1920. Tiled inference was benchmarked and
+        rejected for now (gains were mostly shadow false positives). See the
+        [decision log](docs/decision-log.md).
+- [ ] Inference near native resolution: expose input size on the Ultralytics
+      backend and the replay CLI, and crop to the camera profile's
+      `crop_rect` — currently the pipeline always runs at 640
+- [~] Per-clip `pool_zone` — polygon zones now live in named camera profiles
+      in the label manifest (PR 8), but the tracker still reads the rect in
+      `TrackingSettings`, whose default is the whole frame, so `in_water` is
+      still true for people on the deck
 - [ ] Local RTSP loop via mediamtx to exercise ingest/reconnect path
 - [ ] PagerDuty Free signup + escalation drill — resolves ADR-006's named
       condition (voice calls on free tier?) with zero hardware
@@ -102,13 +122,15 @@ Pi-specific paths. Order hardware (POC-BOM.md) only after PD exits.
 ## P3 — alerting
 
 - [ ] Siren via GPIO relay; armed/swim/maintenance modes
-- [ ] ntfy push with snapshot; Home Assistant via MQTT
+- [~] ntfy push with snapshot; Home Assistant via MQTT — ntfy channel built
+      (PR 9, text only, no snapshot), not yet driven by an alert manager
 - [ ] PagerDuty emergency escalation (per ADR-006; Twilio fallback)
 - [ ] End-to-end staged drill: < 5 s to siren
 
 ## P4 — hardening
 
-- [ ] Watchdog, self-test heartbeat, degraded-mode alerts
+- [~] Watchdog, self-test heartbeat, degraded-mode alerts — heartbeat
+      pinger built (PR 9), not yet called by a running pipeline
 - [ ] One month live tuning; false-alarm budget ≤ 1/week
 
 ## P5 (v2)
