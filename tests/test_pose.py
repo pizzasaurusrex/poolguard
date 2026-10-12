@@ -93,3 +93,20 @@ def test_out_of_range_confidence_is_clamped(frame: Frame) -> None:
     detections = detections_from_arrays(boxes, confidences, None, frame)
 
     assert detections[0].confidence == 1.0
+
+
+def test_non_finite_confidence_is_dropped(frame: Frame) -> None:
+    boxes = np.array([[20.0, 10.0, 120.0, 60.0], [20.0, 10.0, 120.0, 60.0]])
+    confidences = np.array([float("nan"), 0.9])
+
+    detections = detections_from_arrays(boxes, confidences, None, frame)
+
+    assert len(detections) == 1
+    assert detections[0].confidence == pytest.approx(0.9)
+
+
+def test_non_finite_box_is_dropped(frame: Frame) -> None:
+    boxes = np.array([[20.0, float("nan"), 120.0, 60.0], [20.0, 10.0, float("inf"), 60.0]])
+    confidences = np.array([0.9, 0.9])
+
+    assert detections_from_arrays(boxes, confidences, None, frame) == ()

@@ -124,7 +124,7 @@ def advance(
         track
         for i, track in remaining
         if i not in rescued_track_indices
-        and (now - track.last_seen_ts).total_seconds() <= settings.max_coast_seconds
+        and _seconds_unseen(track, now) <= settings.max_coast_seconds
     )
 
     next_id = state.next_track_id
@@ -150,8 +150,18 @@ def _to_person(track: Track, now: AwareDatetime, settings: TrackingSettings) -> 
         track_id=track.track_id,
         detection=track.last_detection,
         in_water=_in_zone(track.last_detection.box, settings.pool_zone),
-        seconds_since_last_seen=(now - track.last_seen_ts).total_seconds(),
+        seconds_since_last_seen=_seconds_unseen(track, now),
     )
+
+
+def _seconds_unseen(track: Track, now: AwareDatetime) -> float:
+    """Time since the track last matched a detection, never negative.
+
+    A live clock can step backwards (an NTP correction), which would make the
+    raw difference negative and fail TrackedPerson validation, stopping the
+    tracker. Reading that as "just seen" keeps detection running.
+    """
+    return max(0.0, (now - track.last_seen_ts).total_seconds())
 
 
 def _in_zone(box: BoundingBox, zone: tuple[float, float, float, float]) -> bool:

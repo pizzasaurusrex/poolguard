@@ -9,17 +9,21 @@ submersion signal made visible.
 from collections import deque
 from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 
 from poolguard.config import RulesSettings, TrackingSettings
 from poolguard.events import TrackedPerson
-from poolguard.labels import ShotLabel
 from poolguard.replay import TrackedFrameResult, run_tracked_replay
 from poolguard.vision.frames import Frame, FrameSource
 from poolguard.vision.hud import HudState, draw_hud
 from poolguard.vision.pose import PoseEstimator
+
+if TYPE_CHECKING:
+    # Type-only: labels.py needs PyYAML, which the vision extra does not install.
+    from poolguard.labels import ShotLabel
 
 FALLBACK_FPS = 15.0
 
@@ -126,7 +130,7 @@ def _hud_state(
     start_ts: object,
     frames_seen: int,
     frames_with_detections: int,
-    label: ShotLabel | None,
+    label: "ShotLabel | None",
     rules: RulesSettings,
 ) -> HudState:
     live = tuple(p for p in result.people if p.seconds_since_last_seen == 0.0)
@@ -149,7 +153,7 @@ def render_tracked_replay(
     estimator: PoseEstimator,
     settings: TrackingSettings,
     out_path: str | Path,
-    label: ShotLabel | None = None,
+    label: "ShotLabel | None" = None,
     rules: RulesSettings | None = None,
 ) -> Iterator[TrackedFrameResult]:
     """run_tracked_replay that also writes an annotated video as it goes.
