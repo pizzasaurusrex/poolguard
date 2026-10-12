@@ -5,7 +5,7 @@ recording scripts."""
 def main() -> None:
     raise SystemExit(
         "poolguard pipeline not implemented yet (P2). "
-        "For Phase 0, run: poolguard-benchmark --rtsp-url <url>"
+        "For Phase 0, set POOLGUARD_CAMERA_RTSP_URL and run: poolguard-benchmark"
     )
 
 

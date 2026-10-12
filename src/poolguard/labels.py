@@ -12,8 +12,9 @@ teleports every person in frame and forces the tracker to spawn new IDs,
 inflating fragmentation metrics for reasons that have nothing to do with the
 tracker.
 
-This module is never imported by the core pipeline (it needs PyYAML, a dev-only
-dependency), following the same isolation rule as the vision backends.
+This module is never imported by the core pipeline (it needs PyYAML, installed
+by the `labels` extra and the dev group), following the same isolation rule as
+the vision backends.
 """
 
 from pathlib import Path
