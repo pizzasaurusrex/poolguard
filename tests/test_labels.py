@@ -11,7 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from poolguard.events import EventType
-from poolguard.labels import ShotLabel, ShotLabels, load_shot_labels
+from poolguard.labels import CameraProfile, ShotLabel, ShotLabels, load_shot_labels
 
 MANIFEST = Path(__file__).parent / "labels" / "shots.yaml"
 
@@ -110,3 +110,56 @@ class TestLoader:
         path.write_text("- just\n- a\n- list\n")
         with pytest.raises(ValueError, match="must be a mapping"):
             load_shot_labels(path)
+
+
+SQUARE = ((0.2, 0.2), (0.8, 0.2), (0.8, 0.6), (0.2, 0.6))
+
+
+class TestCameraProfile:
+    def test_derives_crop_rect_from_polygon_bounds(self) -> None:
+        profile = CameraProfile(water_polygon=SQUARE, crop_margin=0.0)
+        assert profile.crop_rect == pytest.approx((0.2, 0.2, 0.6, 0.4))
+
+    def test_crop_margin_expands_the_rect(self) -> None:
+        profile = CameraProfile(water_polygon=SQUARE, crop_margin=0.05)
+        x, y, w, h = profile.crop_rect
+        assert (x, y) == pytest.approx((0.15, 0.15))
+        assert (w, h) == pytest.approx((0.7, 0.5))
+
+    def test_crop_rect_clamps_to_frame(self) -> None:
+        """A pool touching the frame edge must not produce a crop outside it."""
+        profile = CameraProfile(water_polygon=((0.0, 0.0), (1.0, 0.0), (1.0, 1.0)), crop_margin=0.2)
+        x, y, w, h = profile.crop_rect
+        assert (x, y, w, h) == pytest.approx((0.0, 0.0, 1.0, 1.0))
+
+    def test_rejects_polygon_without_area(self) -> None:
+        with pytest.raises(ValidationError, match="at least 3 vertices"):
+            CameraProfile(water_polygon=((0.1, 0.1), (0.5, 0.5)))
+
+    def test_rejects_vertex_outside_normalized_range(self) -> None:
+        with pytest.raises(ValidationError, match="out of normalized range"):
+            CameraProfile(water_polygon=((0.1, 0.1), (1.4, 0.5), (0.2, 0.9)))
+
+
+class TestCameraReferences:
+    def test_shot_without_camera_is_valid(self) -> None:
+        """Scraped clips have no stable geometry and must still load."""
+        manifest = ShotLabels(shots=(label(),))
+        assert manifest.camera_for(manifest.shots[0]) is None
+
+    def test_resolves_named_camera(self) -> None:
+        manifest = ShotLabels(
+            shots=(label(camera="backyard"),),
+            cameras={"backyard": CameraProfile(water_polygon=SQUARE)},
+        )
+        profile = manifest.camera_for(manifest.shots[0])
+        assert profile is not None
+        assert profile.water_polygon == SQUARE
+
+    def test_rejects_dangling_camera_reference(self) -> None:
+        """A typo must fail loudly rather than silently drop the zone."""
+        with pytest.raises(ValidationError, match="unknown cameras"):
+            ShotLabels(
+                shots=(label(camera="bakyard"),),
+                cameras={"backyard": CameraProfile(water_polygon=SQUARE)},
+            )

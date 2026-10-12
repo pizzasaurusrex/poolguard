@@ -23,6 +23,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from poolguard.events import EventType
 
+MIN_POLYGON_POINTS = 3
+"""Fewest vertices that enclose an area; below this there is no inside."""
+
 MIN_ONSET_WINDOW_SECONDS = 0.1
 """Narrowest onset window a label may claim.
 
@@ -31,6 +34,59 @@ a clip cannot actually deliver, so it is far more likely a typo than a real
 intent — and it would fail the rules engine for annotation jitter, not for
 being wrong.
 """
+
+
+class CameraProfile(BaseModel):
+    """Fixed-camera geometry, shared by every shot recorded from that camera.
+
+    Keyed by name in the manifest so twenty clips from one mount declare their
+    water region once. Only meaningful for a camera that does not move; footage
+    scraped from the internet has no stable geometry and carries no profile.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    water_polygon: tuple[tuple[float, float], ...] = Field(
+        description="Waterline as normalized (x, y) vertices, clockwise from any start. "
+        "A polygon rather than a rect because real pools are not rectangular — the "
+        "bounding box of a kidney pool is roughly a third deck, which is exactly where "
+        "shadow false positives land",
+    )
+    crop_margin: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=0.5,
+        description="Fraction of frame added around the polygon bounds when deriving the "
+        "inference crop. A swimmer's head clears the waterline and people stand on the "
+        "coping, so a crop tight to the water clips the people you most need to see",
+    )
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _polygon_encloses_an_area(self) -> "CameraProfile":
+        if len(self.water_polygon) < MIN_POLYGON_POINTS:
+            raise ValueError(
+                f"water_polygon needs at least {MIN_POLYGON_POINTS} vertices, "
+                f"got {len(self.water_polygon)}"
+            )
+        for x, y in self.water_polygon:
+            if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
+                raise ValueError(f"water_polygon vertex out of normalized range: {(x, y)}")
+        return self
+
+    @property
+    def crop_rect(self) -> tuple[float, float, float, float]:
+        """Normalized (x, y, width, height) region worth running inference over.
+
+        Everything outside it is roof, sky, or fence and cannot contain a swimmer.
+        """
+        xs = [x for x, _ in self.water_polygon]
+        ys = [y for _, y in self.water_polygon]
+        x0 = max(0.0, min(xs) - self.crop_margin)
+        y0 = max(0.0, min(ys) - self.crop_margin)
+        x1 = min(1.0, max(xs) + self.crop_margin)
+        y1 = min(1.0, max(ys) + self.crop_margin)
+        return (x0, y0, x1 - x0, y1 - y0)
 
 
 class ShotLabel(BaseModel):
@@ -45,6 +101,11 @@ class ShotLabel(BaseModel):
         ge=0,
         description="Distinct humans visible in the shot; the tracker should converge to this "
         "many track IDs, so track_count > people is fragmentation",
+    )
+    camera: str | None = Field(
+        default=None,
+        description="Name of a profile in the manifest's `cameras` block. None for footage "
+        "with no known geometry — the scraped clips, where every shot is a different mount",
     )
     expected_event: EventType | None = Field(
         default=None,
@@ -103,6 +164,26 @@ class ShotLabels(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     shots: tuple[ShotLabel, ...]
+    cameras: dict[str, CameraProfile] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _camera_references_resolve(self) -> "ShotLabels":
+        """A typo in a camera name must fail loudly, not silently drop the zone."""
+        dangling = {
+            shot.shot: shot.camera
+            for shot in self.shots
+            if shot.camera is not None and shot.camera not in self.cameras
+        }
+        if dangling:
+            known = sorted(self.cameras) or ["<none defined>"]
+            raise ValueError(
+                f"shots reference unknown cameras: {dangling}; defined cameras are {known}"
+            )
+        return self
+
+    def camera_for(self, shot: ShotLabel) -> CameraProfile | None:
+        """Profile backing this shot, or None when its geometry is unknown."""
+        return self.cameras.get(shot.camera) if shot.camera is not None else None
 
     @model_validator(mode="after")
     def _shot_names_are_unique(self) -> "ShotLabels":

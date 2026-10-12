@@ -34,6 +34,48 @@
 # to what you actually see, then either add BOTH expected_event and
 # onset_window, or leave both off for a shot that must stay quiet.
 
+# ---------------------------------------------------------------------------
+# Camera profiles. A fixed mount has stable geometry, so its water region is
+# declared once here and referenced by name from each shot. Scraped footage
+# has no stable geometry — every clip is a different camera — so those shots
+# carry no `camera` and fall back to whatever pool_zone config supplies.
+#
+# water_polygon is normalized (x, y) vertices tracing the waterline. A polygon
+# rather than a rect because this pool is kidney-shaped: its bounding box is
+# roughly a third deck, and the deck is exactly where tree-shadow false
+# positives appear at inference resolutions high enough to see a swimmer.
+#
+# Traced by eye from 151330 frame 240 and verified by overlay. Approximate at
+# the coping in a couple of places; tighten if edge cases warrant it.
+# ---------------------------------------------------------------------------
+cameras:
+  backyard_simplisafe:
+    notes: >-
+      SimpliSafe outdoor cam, fixed mount, elevated wide angle over the whole
+      pool and deck. 1920x1080 @ 20fps. Barrel distortion at the frame edges.
+      Crop rect covers 41% of the frame, so inference skips 59% of the pixels
+      that can never contain a swimmer.
+    crop_margin: 0.05
+    water_polygon:
+      - [0.224, 0.306]
+      - [0.365, 0.285]
+      - [0.495, 0.294]
+      - [0.615, 0.319]
+      - [0.740, 0.326]
+      - [0.859, 0.370]
+      - [0.932, 0.435]
+      - [0.938, 0.523]
+      - [0.885, 0.597]
+      - [0.771, 0.648]
+      - [0.661, 0.665]
+      - [0.583, 0.622]
+      - [0.510, 0.593]
+      - [0.453, 0.639]
+      - [0.354, 0.622]
+      - [0.260, 0.546]
+      - [0.198, 0.454]
+      - [0.193, 0.370]
+
 shots:
   - shot: activedrowning_01.mp4
     source: active_drowning.mp4
