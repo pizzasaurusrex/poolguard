@@ -168,6 +168,16 @@ class TestCoasting:
         assert people == ()
         assert state.tracks == ()
 
+    def test_clock_stepping_backwards_does_not_crash_or_go_negative(self) -> None:
+        """A live clock can step back (NTP correction); the tracker must keep running."""
+        state, _ = advance(TrackerState(), (det(0.4, 0.4),), START, SETTINGS)
+
+        earlier = START - timedelta(seconds=2)
+        state, people = advance(state, (), earlier, SETTINGS)
+
+        assert len(people) == 1
+        assert people[0].seconds_since_last_seen == 0.0
+
 
 class TestInWater:
     def test_zone_membership_by_box_center(self) -> None:

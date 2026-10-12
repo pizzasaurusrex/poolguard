@@ -30,13 +30,16 @@ def detections_from_arrays(
 
     boxes_xyxy: (n, 4) pixel corners; confidences: (n,); keypoints_xyc:
     (n, k, 3) pixel x, pixel y, confidence — or None for detection-only
-    backends. Boxes are clipped to the frame; degenerate boxes are dropped.
+    backends. Boxes are clipped to the frame; degenerate boxes are dropped,
+    as are rows with a NaN or infinite box or confidence.
     """
     width = float(frame.width)
     height = float(frame.height)
 
     detections: list[Detection] = []
     for i in range(boxes_xyxy.shape[0]):
+        if not (np.isfinite(boxes_xyxy[i]).all() and np.isfinite(confidences[i])):
+            continue
         x1, y1, x2, y2 = boxes_xyxy[i]
         x1 = min(max(float(x1) / width, 0.0), 1.0)
         y1 = min(max(float(y1) / height, 0.0), 1.0)
