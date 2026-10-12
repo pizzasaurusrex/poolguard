@@ -169,8 +169,10 @@ configured channel fails. No camera or vision extra is needed.
 ## Other utilities
 
 ```sh
-# P0 bench: measure raw RTSP capture FPS (needs a live stream)
-uv run poolguard-benchmark --rtsp-url rtsp://user:pass@cam/h264Preview_01_main
+# P0 bench: measure raw RTSP capture FPS (needs a live stream).
+# The URL holds the camera password, so it comes from the environment or .env,
+# never a command-line flag.
+POOLGUARD_CAMERA_RTSP_URL=rtsp://user:pass@cam/h264Preview_01_main uv run poolguard-benchmark
 ```
 
 ## Layout
