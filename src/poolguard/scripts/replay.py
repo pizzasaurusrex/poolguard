@@ -12,7 +12,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from poolguard.labels import ShotLabel
+    from poolguard.labels import CameraProfile, ShotLabel
 
 try:
     from poolguard.vision.ultralytics_pose import (
@@ -35,10 +35,14 @@ def _describe(person: TrackedPerson) -> str:
     return f"#{person.track_id}{suffix}"
 
 
-def _find_label(args: argparse.Namespace) -> "ShotLabel | None":
-    """Look up the manifest entry whose shot name matches the replayed file."""
+def _find_label(args: argparse.Namespace) -> "tuple[ShotLabel | None, CameraProfile | None]":
+    """Look up the manifest entry matching the replayed file, and its camera profile.
+
+    The profile is None when the shot names no camera (scraped footage has no
+    stable geometry), as well as when there is no label.
+    """
     if not args.labels:
-        return None
+        return None, None
     from pathlib import Path
 
     try:
@@ -47,11 +51,12 @@ def _find_label(args: argparse.Namespace) -> "ShotLabel | None":
         raise SystemExit("--labels needs PyYAML — run: uv sync --extra labels") from exc
 
     wanted = Path(args.video).name
-    for shot in load_shot_labels(Path(args.labels)).shots:
+    manifest = load_shot_labels(Path(args.labels))
+    for shot in manifest.shots:
         if shot.shot == wanted:
-            return shot
-    print(f"warning: no label for {wanted} in {args.labels}; rendering without expectations")
-    return None
+            return shot, manifest.camera_for(shot)
+    print(f"warning: no label for {wanted} in {args.labels}; replaying without expectations")
+    return None, None
 
 
 def main() -> None:
@@ -78,13 +83,18 @@ def main() -> None:
     parser.add_argument(
         "--labels",
         metavar="SHOTS_YAML",
-        help="shot manifest; the entry matching --video adds its expected event to the overlay",
+        help="shot manifest; the entry matching --video supplies the expected event for the "
+        "overlay and, when its camera has a profile, the pool zone",
     )
     args = parser.parse_args()
     if args.render:
         args.track = True
 
+    label, camera = _find_label(args)
     settings = TrackingSettings()
+    if camera is not None:
+        # Already validated by CameraProfile, so a plain copy is safe.
+        settings = settings.model_copy(update={"pool_zone": camera.water_polygon})
     min_confidence = (
         args.min_confidence if args.min_confidence is not None else settings.low_confidence
     )
@@ -105,7 +115,7 @@ def main() -> None:
             from poolguard.vision.render import render_tracked_replay
 
             tracked_results = render_tracked_replay(
-                source, estimator, settings, args.render, label=_find_label(args)
+                source, estimator, settings, args.render, label=label
             )
         else:
             tracked_results = run_tracked_replay(source, estimator, settings)

@@ -28,6 +28,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from poolguard.config import TrackingSettings
 from poolguard.events import BoundingBox, Detection, TrackedPerson
+from poolguard.geometry import Polygon, point_in_polygon
 
 
 class Track(BaseModel):
@@ -218,8 +219,7 @@ def _seconds_unseen(track: Track, now: AwareDatetime) -> float:
     return max(0.0, (now - track.last_seen_ts).total_seconds())
 
 
-def _in_zone(box: BoundingBox, zone: tuple[float, float, float, float]) -> bool:
+def _in_zone(box: BoundingBox, zone: Polygon) -> bool:
     center_x = box.x + box.width / 2
     center_y = box.y + box.height / 2
-    zone_x, zone_y, zone_width, zone_height = zone
-    return zone_x <= center_x <= zone_x + zone_width and zone_y <= center_y <= zone_y + zone_height
+    return point_in_polygon(center_x, center_y, zone)

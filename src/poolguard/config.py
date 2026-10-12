@@ -13,6 +13,7 @@ from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from poolguard.events import OperatingMode
+from poolguard.geometry import WHOLE_FRAME, Polygon, validate_polygon
 
 ENV_FILE = ".env"
 
@@ -71,9 +72,10 @@ class TrackingSettings(BaseSettings):
         gt=0,
         description="How long an unseen track survives before it is dropped",
     )
-    pool_zone: tuple[float, float, float, float] = Field(
-        default=(0.0, 0.0, 1.0, 1.0),
-        description="Water region as normalized (x, y, width, height); default is whole frame",
+    pool_zone: Polygon = Field(
+        default=WHOLE_FRAME,
+        description="Waterline as normalized (x, y) vertices; default is the whole frame. "
+        "From the environment, a JSON list of pairs: [[0.2, 0.3], [0.9, 0.4], [0.5, 0.7]]",
     )
 
     @model_validator(mode="after")
@@ -88,12 +90,8 @@ class TrackingSettings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def _pool_zone_is_normalized(self) -> "TrackingSettings":
-        x, y, width, height = self.pool_zone
-        if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
-            raise ValueError(f"pool_zone origin must be within [0, 1]: {self.pool_zone}")
-        if not (0.0 < width <= 1.0 and 0.0 < height <= 1.0):
-            raise ValueError(f"pool_zone width/height must be in (0, 1]: {self.pool_zone}")
+    def _pool_zone_is_a_usable_polygon(self) -> "TrackingSettings":
+        validate_polygon(self.pool_zone, name="pool_zone")
         return self
 
 
