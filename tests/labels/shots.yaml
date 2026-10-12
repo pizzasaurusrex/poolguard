@@ -45,36 +45,55 @@
 # roughly a third deck, and the deck is exactly where tree-shadow false
 # positives appear at inference resolutions high enough to see a swimmer.
 #
-# Traced by eye from 151330 frame 240 and verified by overlay. Approximate at
-# the coping in a couple of places; tighten if edge cases warrant it.
+# Traced automatically on 2026-10-12 from the five backyard clips: a median
+# frame (which removes swimmers), a water-colour mask, and the largest contour
+# simplified to 35 vertices, then verified by overlay. It hugs the waterline, so
+# the coping and deck are outside. Re-trace if the camera is moved.
 # ---------------------------------------------------------------------------
 cameras:
   backyard_simplisafe:
     notes: >-
       SimpliSafe outdoor cam, fixed mount, elevated wide angle over the whole
       pool and deck. 1920x1080 @ 20fps. Barrel distortion at the frame edges.
-      Crop rect covers 41% of the frame, so inference skips 59% of the pixels
+      Crop rect covers 40% of the frame, so inference skips 60% of the pixels
       that can never contain a swimmer.
     crop_margin: 0.05
     water_polygon:
-      - [0.224, 0.306]
-      - [0.365, 0.285]
-      - [0.495, 0.294]
-      - [0.615, 0.319]
-      - [0.740, 0.326]
-      - [0.859, 0.370]
-      - [0.932, 0.435]
-      - [0.938, 0.523]
-      - [0.885, 0.597]
-      - [0.771, 0.648]
-      - [0.661, 0.665]
-      - [0.583, 0.622]
-      - [0.510, 0.593]
-      - [0.453, 0.639]
-      - [0.354, 0.622]
-      - [0.260, 0.546]
-      - [0.198, 0.454]
-      - [0.193, 0.370]
+      - [0.199, 0.430]
+      - [0.199, 0.456]
+      - [0.218, 0.501]
+      - [0.247, 0.532]
+      - [0.290, 0.558]
+      - [0.367, 0.575]
+      - [0.478, 0.569]
+      - [0.515, 0.577]
+      - [0.565, 0.599]
+      - [0.663, 0.662]
+      - [0.734, 0.688]
+      - [0.783, 0.688]
+      - [0.822, 0.669]
+      - [0.845, 0.638]
+      - [0.852, 0.591]
+      - [0.863, 0.564]
+      - [0.908, 0.553]
+      - [0.918, 0.533]
+      - [0.913, 0.502]
+      - [0.885, 0.451]
+      - [0.885, 0.428]
+      - [0.873, 0.409]
+      - [0.867, 0.409]
+      - [0.866, 0.419]
+      - [0.853, 0.419]
+      - [0.797, 0.374]
+      - [0.733, 0.352]
+      - [0.669, 0.368]
+      - [0.611, 0.363]
+      - [0.482, 0.309]
+      - [0.436, 0.298]
+      - [0.354, 0.300]
+      - [0.276, 0.324]
+      - [0.222, 0.370]
+      - [0.208, 0.393]
 
 shots:
   - shot: activedrowning_01.mp4
