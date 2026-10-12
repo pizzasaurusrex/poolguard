@@ -52,6 +52,20 @@ class TrackingSettings(BaseSettings):
         le=1.0,
         description="Minimum box overlap for a detection to match an existing track",
     )
+    containment_min: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Minimum share of the smaller box inside the larger for a detection to "
+        "keep a recently seen track's ID when IoU fails (head-only vs whole-body boxes)",
+    )
+    containment_window_seconds: float = Field(
+        default=1.0,
+        ge=0.0,
+        description="Only tracks seen within this long are eligible for containment matching. "
+        "Kept short on purpose: a newcomer's large box must not adopt, and so reset the "
+        "unseen clock of, someone who has been under for longer",
+    )
     max_coast_seconds: float = Field(
         default=30.0,
         gt=0,
