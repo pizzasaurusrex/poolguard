@@ -1,0 +1,146 @@
+# Ground-truth labels for the replay regression suite.
+#
+# The footage is gitignored; this manifest is the committed artifact. A shot
+# whose file is missing locally is skipped by the regression run, so it is safe
+# to label the shots you have and let others fill in later.
+#
+# Shots live in clips/ and are already split at their cut boundaries — a cut
+# teleports everyone in frame and forces new track IDs, which is editing, not
+# tracker error.
+#
+# IMPORTANT: every clip in this set shows its event from frame one — there is no
+# calm lead-in. So the rules engine's clock effectively starts at t=0, the
+# earliest possible fire is exactly the rule's threshold, and a clip can only
+# test its rule if duration > threshold. That makes clip length, not scene
+# content, the binding constraint on this library. Four of the six positives
+# fail that test today (marked TOO SHORT); footage with a lead-in and more
+# runway is the main gap to fill.
+#
+# Fields:
+#   shot              file name under clips/
+#   source            the original clip it was cut from
+#   duration_seconds  ffprobe -show_entries format=duration
+#   people            distinct humans visible; the tracker should converge to
+#                     this many IDs, so more IDs than this is fragmentation
+#   expected_event    distress | submersion | unsupervised_entry, or omit for a
+#                     shot that must stay quiet (the false-alarm budget)
+#   onset_window      [start, end] seconds from shot start; the event must fire
+#                     inside this window. Firing late is a failure even when the
+#                     verdict is right — a drowning alert at t+40s is not a save.
+#                     Required whenever expected_event is set, and vice versa.
+#   notes             free text; why you labeled it this way
+#
+# TO LABEL: each entry below has its objective fields filled in. Set `people`
+# to what you actually see, then either add BOTH expected_event and
+# onset_window, or leave both off for a shot that must stay quiet.
+
+# ---------------------------------------------------------------------------
+# Camera profiles. A fixed mount has stable geometry, so its water region is
+# declared once here and referenced by name from each shot. Scraped footage
+# has no stable geometry — every clip is a different camera — so those shots
+# carry no `camera` and fall back to whatever pool_zone config supplies.
+#
+# water_polygon is normalized (x, y) vertices tracing the waterline. A polygon
+# rather than a rect because this pool is kidney-shaped: its bounding box is
+# roughly a third deck, and the deck is exactly where tree-shadow false
+# positives appear at inference resolutions high enough to see a swimmer.
+#
+# Traced by eye from 151330 frame 240 and verified by overlay. Approximate at
+# the coping in a couple of places; tighten if edge cases warrant it.
+# ---------------------------------------------------------------------------
+cameras:
+  backyard_simplisafe:
+    notes: >-
+      SimpliSafe outdoor cam, fixed mount, elevated wide angle over the whole
+      pool and deck. 1920x1080 @ 20fps. Barrel distortion at the frame edges.
+      Crop rect covers 41% of the frame, so inference skips 59% of the pixels
+      that can never contain a swimmer.
+    crop_margin: 0.05
+    water_polygon:
+      - [0.224, 0.306]
+      - [0.365, 0.285]
+      - [0.495, 0.294]
+      - [0.615, 0.319]
+      - [0.740, 0.326]
+      - [0.859, 0.370]
+      - [0.932, 0.435]
+      - [0.938, 0.523]
+      - [0.885, 0.597]
+      - [0.771, 0.648]
+      - [0.661, 0.665]
+      - [0.583, 0.622]
+      - [0.510, 0.593]
+      - [0.453, 0.639]
+      - [0.354, 0.622]
+      - [0.260, 0.546]
+      - [0.198, 0.454]
+      - [0.193, 0.370]
+
+shots:
+  - shot: activedrowning_01.mp4
+    source: active_drowning.mp4
+    duration_seconds: 7.52
+    people: 1
+    expected_event: distress
+    onset_window: [5.0, 7.5]
+    notes: "Child bobbing in pool, struggling to stay afloat, active drowning. Window starts at distress_sustained_seconds (5.0s) — the rule cannot conclude sooner — and runs to the end of the clip."
+
+  - shot: childdrowning_02.mp4
+    source: child_drowning.mp4
+    duration_seconds: 4.18
+    people: 1
+    expected_event: distress
+    onset_window: [2.0, 4.1]
+    notes: "Child struggling, head barely above water, active drowning — visible from frame one, no lead-in. TOO SHORT: even with evidence starting at t=0, the 5.0s distress threshold outruns the 4.18s clip. Window is the clip end, not a real expectation; tracker-only until a longer cut exists or the threshold drops."
+
+  - shot: childFallsIn_03.mov
+    source: child_falls_in.mov
+    duration_seconds: 3.84
+    people: 1
+    expected_event: submersion
+    onset_window: [2.0, 3.8]
+    notes: "Toddler falls into water and stays submerged in the initial reaction phase — submersion begins essentially at frame one. TOO SHORT: 3.84s clip against a 15.0s submersion threshold, the widest gap in the set. Tracker-only; a longer cut of this scene is the single most valuable clip to source."
+
+  - shot: deepWaterStruggle_04.mp4
+    source: deep_water_struggling.mp4
+    duration_seconds: 3.84
+    people: 6
+    expected_event: distress
+    onset_window: [2.0, 3.8]
+    notes: "Multiple people in pool, one struggling to stay afloat — struggle visible from frame one. TOO SHORT: 3.84s clip against the 5.0s distress threshold. Its real value is the tracker: six people means occlusion and crossing paths, the hardest ID-retention case in the set."
+
+  - shot: distress_05.mp4
+    source: old_man_distress.mp4
+    duration_seconds: 14.59
+    people: 1
+    expected_event: distress
+    onset_window: [5.0, 10.0]
+    notes: "Old man in distress, struggling to stay afloat. Longest distress clip and the most comfortable margin over the 5.0s threshold — the reference positive for the distress rule."
+
+  - shot: nonDrownin_06.mp4
+    source: nondrowning.mp4
+    duration_seconds: 4.10
+    people: 1
+    notes: "Child bobbing in pool, but not struggling to stay afloat. Alert should NOT fire."
+
+  - shot: struggling_07.mp4
+    source: struggling.mp4
+    duration_seconds: 5.30
+    people: 1
+    notes: " Child struggling to stay afloat, but not fully submerged. Not actively drowning just bad treading alert should not fire."
+
+  - shot: fullySubmerged_08.mp4
+    source: fullySubmerged_08.mp4
+    duration_seconds: 13.79
+    people: 1
+    expected_event: submersion
+    onset_window: [12.0, 13.7]
+    notes: "Fully submerged individual, drowning/drowned — submerged from frame one. The only clip that can exercise the submersion rule, and only after the threshold dropped to 12.0s in POC; 1.7s of runway is a thin margin, so a longer cut would make this a far better reference positive."
+
+  - shot: fallsInDrowns_09.mov
+    source: falls_in_drown_09.mov
+    duration_seconds: 11.91
+    people: 2
+    expected_event: distress
+    onset_window: [9.0, 11.9]
+    notes: "Child falls in off a raft and begins drowning while another child tries to help from outside the pool. The only clip with a real lead-in: struggle starts ~4s, so distress (5.0s threshold) can conclude ~9s with 2.9s of runway — the best positive in the set. Labeled distress rather than submersion because 4s + 12s submersion threshold = 16s, past the 11.91s end. Note the second person is OUT of the water: a good in_water / pool_zone test."

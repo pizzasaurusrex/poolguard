@@ -80,7 +80,15 @@ class RulesSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="POOLGUARD_RULES_", frozen=True)
 
     distress_sustained_seconds: float = Field(default=5.0, gt=0)
-    submersion_timeout_seconds: float = Field(default=15.0, gt=0)
+    submersion_timeout_seconds: float = Field(
+        default=12.0,
+        gt=0,
+        description="Seconds a track may stay unseen inside the pool zone before submersion is "
+        "raised. PROVISIONAL: lowered 15.0 -> 12.0 in POC to keep the rule reachable on short "
+        "footage. No clip validates it yet — the one fully-submerged clip never spawns a track "
+        "to lose (2% detection rate underwater). Re-derive from staged/P1 footage against the "
+        "false-alarm budget — kids dive under routinely — not from clip lengths.",
+    )
     default_mode: OperatingMode = OperatingMode.ARMED
 
 

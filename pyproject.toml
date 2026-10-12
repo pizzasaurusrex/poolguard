@@ -21,6 +21,7 @@ vision = [
 dev = [
     "pytest>=8.2",
     "pytest-cov>=5.0",
+    "pyyaml>=6.0",
     "ruff>=0.5",
 ]
 
@@ -38,7 +39,10 @@ packages = ["src/poolguard"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not regression'"
+markers = [
+    "regression: replays labeled footage through a real pose model (slow, opt-in)",
+]
 
 [tool.ruff]
 line-length = 100
