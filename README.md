@@ -183,7 +183,7 @@ POOLGUARD_CAMERA_RTSP_URL=rtsp://user:pass@cam/h264Preview_01_main uv run poolgu
 src/poolguard/
   events.py      # immutable Pydantic models passed between pipeline stages
   config.py      # validated runtime settings (env / .env)
-  tracking.py    # two-pass IoU tracker: Detections -> persistent TrackedPerson tracks
+  tracking.py    # greedy box-overlap tracker: Detections -> persistent TrackedPerson tracks
   replay.py      # offline pipeline loop over a FrameSource (PD test harness)
   labels.py      # schema for the shot-label manifest (dev only, needs PyYAML)
   vision/        # frame + pose seams: protocols, video-file source, Ultralytics backend,

@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from poolguard.config import TrackingSettings
 from poolguard.events import BoundingBox, Detection
-from poolguard.tracking import TrackerState, advance, iou
+from poolguard.tracking import TrackerState, advance, containment, iou
 
 START = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -137,6 +137,66 @@ class TestIdPersistence:
         state, people = advance(state, (det(0.8, 0.8, ts=later),), later, SETTINGS)
 
         assert sorted(p.track_id for p in people) == [1, 2]  # old coasts, new spawns
+
+
+class TestContainment:
+    def test_box_inside_another_is_fully_contained(self) -> None:
+        head = det(0.4, 0.4, width=0.1, height=0.1).box
+        body = det(0.3, 0.3, width=0.5, height=0.3).box
+        assert containment(head, body) == pytest.approx(1.0)
+        assert containment(body, head) == pytest.approx(1.0)
+
+    def test_disjoint_boxes(self) -> None:
+        a = det(0.0, 0.0).box
+        b = det(0.5, 0.5).box
+        assert containment(a, b) == 0.0
+
+
+class TestBoxShapeChange:
+    """The model's box for one swimmer flips between head-only and whole-body.
+
+    IoU between those is low even though one sits inside the other, so IoU
+    alone reads the same person as a newcomer and spawns a fresh ID.
+    """
+
+    HEAD = {"width": 0.12, "height": 0.2}
+    BODY = {"width": 0.5, "height": 0.22}
+
+    def test_box_growing_around_the_old_one_keeps_its_id(self) -> None:
+        state, first = advance(TrackerState(), (det(0.32, 0.08, **self.HEAD),), START, SETTINGS)
+        later = START + timedelta(seconds=0.1)
+        state, people = advance(state, (det(0.3, 0.07, ts=later, **self.BODY),), later, SETTINGS)
+
+        assert [p.track_id for p in people] == [first[0].track_id]
+        assert people[0].seconds_since_last_seen == 0.0
+
+    def test_box_shrinking_inside_the_old_one_keeps_its_id(self) -> None:
+        state, first = advance(TrackerState(), (det(0.3, 0.07, **self.BODY),), START, SETTINGS)
+        later = START + timedelta(seconds=0.1)
+        state, people = advance(state, (det(0.32, 0.08, ts=later, **self.HEAD),), later, SETTINGS)
+
+        assert [p.track_id for p in people] == [first[0].track_id]
+
+    def test_long_unseen_track_is_not_adopted_by_a_covering_box(self) -> None:
+        """Safety: a newcomer's big box must not reset a submerged person's clock."""
+        state, _ = advance(TrackerState(), (det(0.32, 0.08, **self.HEAD),), START, SETTINGS)
+        later = START + timedelta(seconds=SETTINGS.containment_window_seconds + 1.0)
+        state, people = advance(state, (det(0.3, 0.07, ts=later, **self.BODY),), later, SETTINGS)
+
+        assert sorted(p.track_id for p in people) == [1, 2]
+        coasting = next(p for p in people if p.track_id == 1)
+        assert coasting.seconds_since_last_seen > SETTINGS.containment_window_seconds
+
+    def test_covering_box_does_not_steal_a_track_that_matched_its_own_detection(self) -> None:
+        state, _ = advance(TrackerState(), (det(0.32, 0.08, **self.HEAD),), START, SETTINGS)
+        later = START + timedelta(seconds=0.1)
+        detections = (
+            det(0.32, 0.08, ts=later, **self.HEAD),
+            det(0.3, 0.07, ts=later, **self.BODY),
+        )
+        state, people = advance(state, detections, later, SETTINGS)
+
+        assert sorted(p.track_id for p in people) == [1, 2]
 
 
 class TestLowConfidenceRescue:

@@ -1,21 +1,28 @@
-"""Two-pass IoU tracker (ByteTrack-style association, no motion model).
+"""Greedy box-overlap tracker (ByteTrack-style association, no motion model).
 
 Turns per-frame Detections into persistent TrackedPerson streams. The design
 choice that matters for safety: a track that stops matching is *not* deleted —
 it coasts, and its seconds_since_last_seen keeps growing. A coasting track
 inside the pool zone is the raw signal for the submersion rule.
 
-Association is two passes of greedy IoU matching:
-  pass 1: high-confidence detections vs all live tracks
-  pass 2: low-confidence detections vs tracks still unmatched (the "rescue"
-          pass — a weak detection where a track already was is almost
-          certainly still that person)
+Association is three greedy passes:
+  pass 1: high-confidence detections vs all live tracks, by IoU
+  pass 2: high-confidence detections still unmatched vs tracks seen within
+          the last containment_window_seconds, by containment — the model's
+          box for one swimmer flips between head-only and whole-body, which
+          IoU scores as a different person
+  pass 3: low-confidence detections vs tracks still unmatched, by IoU (the
+          "rescue" pass — a weak detection where a track already was is
+          almost certainly still that person)
 Only unmatched high-confidence detections spawn new tracks; low-confidence
 ones never do, so splash noise cannot create phantom people.
 
 The tracker itself is a pure function: advance(state, ...) returns a new
 state, so replay and tests can fold it like ReplaySummary.
 """
+
+from collections.abc import Callable
+from typing import NamedTuple
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -42,36 +49,55 @@ class TrackerState(BaseModel):
     tracks: tuple[Track, ...] = ()
 
 
-def iou(a: BoundingBox, b: BoundingBox) -> float:
-    """Intersection-over-union of two normalized boxes."""
+def _intersection_area(a: BoundingBox, b: BoundingBox) -> float:
     left = max(a.x, b.x)
     top = max(a.y, b.y)
     right = min(a.x + a.width, b.x + b.width)
     bottom = min(a.y + a.height, b.y + b.height)
     if right <= left or bottom <= top:
         return 0.0
-    intersection = (right - left) * (bottom - top)
+    return (right - left) * (bottom - top)
+
+
+def iou(a: BoundingBox, b: BoundingBox) -> float:
+    """Intersection-over-union of two normalized boxes."""
+    intersection = _intersection_area(a, b)
     union = a.width * a.height + b.width * b.height - intersection
     return intersection / union
+
+
+def containment(a: BoundingBox, b: BoundingBox) -> float:
+    """Share of the smaller box that lies inside the larger one.
+
+    1.0 when one box sits wholly within the other, whatever their sizes. IoU
+    scores that case low when the sizes differ, which is exactly what happens
+    when the model boxes a swimmer's head in one frame and whole body the next.
+    """
+    smaller_area = min(a.width * a.height, b.width * b.height)
+    return _intersection_area(a, b) / smaller_area
+
+
+BoxScore = Callable[[BoundingBox, BoundingBox], float]
 
 
 def match_greedy(
     tracks: tuple[Track, ...],
     detections: tuple[Detection, ...],
-    iou_min: float,
+    minimum_score: float,
+    score_boxes: BoxScore = iou,
 ) -> tuple[tuple[int, int], ...]:
-    """Greedily pair tracks with detections by IoU.
+    """Greedily pair tracks with detections, strongest score first.
 
     Returns (track_index, detection_index) pairs. Each track and each
     detection may appear in at most one pair, and a pair is only valid if
-    iou(track.last_detection.box, detection.box) >= iou_min.
+    score_boxes(track.last_detection.box, detection.box) >= minimum_score.
     """
 
     candidates = []
     for track_index, track in enumerate(tracks):
         for detection_index, detection in enumerate(detections):
-            score = iou(track.last_detection.box, detection.box)
-            if score >= iou_min:
+            score = score_boxes(track.last_detection.box, detection.box)
+            if score >= minimum_score:
                 candidates.append((score, track_index, detection_index))
 
     matched = []
@@ -84,6 +110,36 @@ def match_greedy(
         matched.append((track_index, detection_index))
 
     return tuple(matched)
+
+
+class _Association(NamedTuple):
+    """Outcome of one matching pass."""
+
+    matched: tuple[tuple[Track, Detection], ...]
+    unmatched_tracks: tuple[Track, ...]
+    unmatched_detections: tuple[Detection, ...]
+
+
+def _associate(
+    tracks: tuple[Track, ...],
+    detections: tuple[Detection, ...],
+    minimum_score: float,
+    score_boxes: BoxScore = iou,
+) -> _Association:
+    pairs = match_greedy(tracks, detections, minimum_score, score_boxes)
+    matched_track_indices = {track_index for track_index, _ in pairs}
+    matched_detection_indices = {detection_index for _, detection_index in pairs}
+    return _Association(
+        matched=tuple((tracks[t], detections[d]) for t, d in pairs),
+        unmatched_tracks=tuple(
+            track for i, track in enumerate(tracks) if i not in matched_track_indices
+        ),
+        unmatched_detections=tuple(
+            detection
+            for i, detection in enumerate(detections)
+            if i not in matched_detection_indices
+        ),
+    )
 
 
 def advance(
@@ -102,41 +158,39 @@ def advance(
         d for d in detections if settings.low_confidence <= d.confidence < settings.high_confidence
     )
 
-    matched_pairs = match_greedy(state.tracks, high, settings.iou_min)
-    matched_track_indices = {t for t, _ in matched_pairs}
-    matched_high_indices = {d for _, d in matched_pairs}
+    by_overlap = _associate(state.tracks, high, settings.iou_min)
 
-    remaining = tuple(
-        (i, track) for i, track in enumerate(state.tracks) if i not in matched_track_indices
+    recently_seen = tuple(
+        track
+        for track in by_overlap.unmatched_tracks
+        if _seconds_unseen(track, now) <= settings.containment_window_seconds
     )
-    rescue_pairs = match_greedy(tuple(track for _, track in remaining), low, settings.iou_min)
+    by_containment = _associate(
+        recently_seen, by_overlap.unmatched_detections, settings.containment_min, containment
+    )
+    reshaped_ids = {track.track_id for track, _ in by_containment.matched}
+    still_unmatched = tuple(
+        track for track in by_overlap.unmatched_tracks if track.track_id not in reshaped_ids
+    )
 
-    updated: list[Track] = []
-    for track_index, detection_index in matched_pairs:
-        updated.append(_touch(state.tracks[track_index], high[detection_index], now))
-    rescued_track_indices = set()
-    for local_index, detection_index in rescue_pairs:
-        original_index, track = remaining[local_index]
-        rescued_track_indices.add(original_index)
-        updated.append(_touch(track, low[detection_index], now))
+    rescue = _associate(still_unmatched, low, settings.iou_min)
 
+    updated = tuple(
+        _touch(track, detection, now)
+        for track, detection in by_overlap.matched + by_containment.matched + rescue.matched
+    )
     coasting = tuple(
         track
-        for i, track in remaining
-        if i not in rescued_track_indices
-        and _seconds_unseen(track, now) <= settings.max_coast_seconds
+        for track in rescue.unmatched_tracks
+        if _seconds_unseen(track, now) <= settings.max_coast_seconds
+    )
+    spawned = tuple(
+        Track(track_id=state.next_track_id + offset, last_detection=detection, last_seen_ts=now)
+        for offset, detection in enumerate(by_containment.unmatched_detections)
     )
 
-    next_id = state.next_track_id
-    spawned: list[Track] = []
-    for i, detection in enumerate(high):
-        if i in matched_high_indices:
-            continue
-        spawned.append(Track(track_id=next_id, last_detection=detection, last_seen_ts=now))
-        next_id += 1
-
-    tracks = tuple(updated) + coasting + tuple(spawned)
-    new_state = TrackerState(next_track_id=next_id, tracks=tracks)
+    tracks = updated + coasting + spawned
+    new_state = TrackerState(next_track_id=state.next_track_id + len(spawned), tracks=tracks)
     people = tuple(_to_person(track, now, settings) for track in tracks)
     return new_state, people
 
