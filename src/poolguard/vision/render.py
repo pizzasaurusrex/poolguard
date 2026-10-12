@@ -8,6 +8,7 @@ submersion signal made visible.
 
 from collections import deque
 from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -124,7 +125,7 @@ def _draw_coasting(
 
 def _hud_state(
     result: TrackedFrameResult,
-    start_ts: object,
+    start_ts: datetime,
     frames_seen: int,
     frames_with_detections: int,
     label: "ShotLabel | None",
@@ -134,10 +135,12 @@ def _hud_state(
     coasting = tuple(p for p in result.people if p.seconds_since_last_seen > 0.0)
     return HudState(
         frame_index=result.frame_index,
-        elapsed_seconds=(result.ts - start_ts).total_seconds(),  # type: ignore[operator]
+        elapsed_seconds=(result.ts - start_ts).total_seconds(),
         live_tracks=len(live),
         coasting_tracks=len(coasting),
-        longest_unseen_seconds=max((p.seconds_since_last_seen for p in coasting), default=0.0),
+        longest_unseen_seconds=max(
+            (p.seconds_since_last_seen for p in coasting if p.in_water), default=0.0
+        ),
         detection_rate=frames_with_detections / max(frames_seen, 1),
         expected_event=label.expected_event.value if label and label.expected_event else None,
         onset_window=label.onset_window if label else None,
