@@ -34,6 +34,9 @@ class HudState(BaseModel):
     live_tracks: int = Field(ge=0)
     coasting_tracks: int = Field(ge=0)
     longest_unseen_seconds: float = Field(ge=0.0)
+    """Longest time a track last seen *in the water* has gone unseen. A track
+    lost on the deck (someone walking out of frame) coasts too, but it is not
+    a submersion signal and does not count here."""
     detection_rate: float = Field(ge=0.0, le=1.0)
     """Share of frames so far that produced at least one detection."""
 
@@ -51,7 +54,7 @@ class HudState(BaseModel):
 
     @property
     def submersion_progress(self) -> float:
-        """How far the longest-coasting track is toward the submersion timeout."""
+        """How far the longest-unseen in-water track is toward the submersion timeout."""
         return min(self.longest_unseen_seconds / self.submersion_timeout_seconds, 1.0)
 
 
@@ -63,8 +66,8 @@ def status_line(state: HudState) -> tuple[str, tuple[int, int, int]]:
     """
     if state.submersion_progress >= 1.0:
         return f"SUBMERSION — unseen {state.longest_unseen_seconds:.1f}s", _ALERT_COLOR
-    if state.coasting_tracks > 0:
-        return f"track lost {state.longest_unseen_seconds:.1f}s", _WARN_COLOR
+    if state.longest_unseen_seconds > 0:
+        return f"in-water track lost {state.longest_unseen_seconds:.1f}s", _WARN_COLOR
     if state.live_tracks == 0:
         return "NO ONE DETECTED", _BLIND_COLOR
     if state.in_onset_window:

@@ -11,11 +11,13 @@ import pytest
 
 cv2 = pytest.importorskip("cv2")
 
-from poolguard.config import TrackingSettings  # noqa: E402
+from poolguard.config import RulesSettings, TrackingSettings  # noqa: E402
 from poolguard.events import BoundingBox, Detection, TrackedPerson  # noqa: E402
 from poolguard.geometry import WHOLE_FRAME  # noqa: E402
+from poolguard.replay import TrackedFrameResult  # noqa: E402
 from poolguard.vision.frames import Frame  # noqa: E402
 from poolguard.vision.render import (  # noqa: E402
+    _hud_state,
     annotate_frame,
     color_for_track,
     render_tracked_replay,
@@ -29,7 +31,7 @@ def blank_image() -> np.ndarray:
     return np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
 
 
-def person(track_id: int, unseen: float = 0.0) -> TrackedPerson:
+def person(track_id: int, unseen: float = 0.0, in_water: bool = True) -> TrackedPerson:
     return TrackedPerson(
         track_id=track_id,
         detection=Detection(
@@ -37,7 +39,7 @@ def person(track_id: int, unseen: float = 0.0) -> TrackedPerson:
             box=BoundingBox(x=0.25, y=0.25, width=0.5, height=0.5),
             confidence=0.9,
         ),
-        in_water=True,
+        in_water=in_water,
         seconds_since_last_seen=unseen,
     )
 
@@ -146,3 +148,35 @@ def test_pool_zone_outline_is_drawn() -> None:
     canvas = annotate_frame(blank_image(), (), pool_zone=triangle)
 
     assert canvas.any()
+
+
+class TestHudStateFromTracks:
+    """Only a track lost *in the water* runs the submersion clock."""
+
+    @staticmethod
+    def hud(*people: TrackedPerson):  # type: ignore[no-untyped-def]
+        result = TrackedFrameResult(frame_index=0, ts=START, detections=(), people=people)
+        return _hud_state(
+            result,
+            start_ts=START,
+            frames_seen=1,
+            frames_with_detections=1,
+            label=None,
+            rules=RulesSettings(),
+        )
+
+    def test_track_lost_on_the_deck_does_not_run_the_clock(self) -> None:
+        state = self.hud(person(1, unseen=20.0, in_water=False))
+
+        assert state.coasting_tracks == 1
+        assert state.longest_unseen_seconds == 0.0
+        assert state.submersion_progress == 0.0
+
+    def test_track_lost_in_the_water_runs_the_clock(self) -> None:
+        state = self.hud(
+            person(1, unseen=20.0, in_water=False),
+            person(2, unseen=7.0, in_water=True),
+        )
+
+        assert state.coasting_tracks == 2
+        assert state.longest_unseen_seconds == 7.0

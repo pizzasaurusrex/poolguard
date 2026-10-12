@@ -72,6 +72,14 @@ class TestStatusPriority:
         assert "lost 3.0s" in text
         assert color == _WARN_COLOR
 
+    def test_track_lost_outside_the_pool_is_not_a_warning(self) -> None:
+        """Someone walking off the deck coasts too; that is not a submersion clock."""
+        text, color = status_line(
+            state(live_tracks=1, coasting_tracks=1, longest_unseen_seconds=0.0)
+        )
+        assert text == "tracking 1"
+        assert color == _CALM_COLOR
+
     def test_blind_when_nothing_detected(self) -> None:
         text, color = status_line(state(live_tracks=0))
         assert text == "NO ONE DETECTED"
