@@ -102,7 +102,8 @@ uv run poolguard-replay --video path/to/clip.mp4
 
 Output is a summary line (frames, frames with people, detection count,
 throughput); add `--per-frame` to see each frame's detections, or
-`--min-confidence 0.4` to raise the detection threshold. The first run
+`--min-confidence 0.4` to raise the detection floor (it defaults to the
+tracker's `low_confidence`, 0.1, so weak detections reach the rescue pass). The first run
 downloads the pose model (~6 MB) to the working directory; weights are
 never committed (see License).
 
@@ -110,10 +111,11 @@ A phone video of people walking nearby is enough to see detections. Pool
 clips are what the PD phase collects for rule development.
 
 **If you get no detections on wide or distant footage,** that is a known
-limit rather than a broken install. The CLI runs the model at its default
-640 px input, and on 1080p footage from a real backyard mount (people 35–100
-px tall) that detected nobody at all; the same footage reached 66% of frames
-at 1280 and 87% at 1920. Input size is not yet a CLI option. People who are
+limit rather than a broken install. The CLI runs the model at the frame's
+own resolution, capped at 1920 px (`--max-inference-size`). Lowering that cap
+is faster but costs detections: on 1080p footage from a real backyard mount
+(people 35–100 px tall) a 640 px input detected nobody at all, 1280 reached
+66% of frames and 1920 reached 87%. People who are
 fully underwater are also close to invisible to this model. Both findings are
 in the [decision log](docs/decision-log.md).
 

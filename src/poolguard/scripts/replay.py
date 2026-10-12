@@ -15,7 +15,11 @@ if TYPE_CHECKING:
     from poolguard.labels import ShotLabel
 
 try:
-    from poolguard.vision.ultralytics_pose import DEFAULT_MODEL, UltralyticsPoseEstimator
+    from poolguard.vision.ultralytics_pose import (
+        DEFAULT_MAX_INFERENCE_SIZE,
+        DEFAULT_MODEL,
+        UltralyticsPoseEstimator,
+    )
     from poolguard.vision.video import VideoFileFrameSource
 except ImportError as exc:
     raise SystemExit("vision deps not installed — run: uv sync --extra vision") from exc
@@ -54,7 +58,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a video through pose detection.")
     parser.add_argument("--video", required=True, help="path to a video file")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="ultralytics pose model")
-    parser.add_argument("--min-confidence", type=float, default=0.25)
+    parser.add_argument(
+        "--min-confidence",
+        type=float,
+        default=None,
+        help="detection floor; defaults to the tracker's low_confidence",
+    )
+    parser.add_argument(
+        "--max-inference-size",
+        type=int,
+        default=DEFAULT_MAX_INFERENCE_SIZE,
+        help="cap on the model input size in pixels; lower is faster but misses distant people",
+    )
     parser.add_argument("--per-frame", action="store_true", help="print each frame's detections")
     parser.add_argument("--track", action="store_true", help="run the tracking stage")
     parser.add_argument(
@@ -69,15 +84,23 @@ def main() -> None:
     if args.render:
         args.track = True
 
+    settings = TrackingSettings()
+    min_confidence = (
+        args.min_confidence if args.min_confidence is not None else settings.low_confidence
+    )
+
     source = VideoFileFrameSource(args.video)
-    estimator = UltralyticsPoseEstimator(model=args.model, min_confidence=args.min_confidence)
+    estimator = UltralyticsPoseEstimator(
+        model=args.model,
+        min_confidence=min_confidence,
+        max_inference_size=args.max_inference_size,
+    )
 
     summary = ReplaySummary()
     track_ids: set[int] = set()
     start = time.monotonic()
 
     if args.track:
-        settings = TrackingSettings()
         if args.render:
             from poolguard.vision.render import render_tracked_replay
 

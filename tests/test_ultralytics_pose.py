@@ -11,8 +11,14 @@ import pytest
 
 pytest.importorskip("ultralytics")
 
+from poolguard.config import TrackingSettings  # noqa: E402
 from poolguard.vision.frames import Frame  # noqa: E402
-from poolguard.vision.ultralytics_pose import UltralyticsPoseEstimator  # noqa: E402
+from poolguard.vision.ultralytics_pose import (  # noqa: E402
+    DEFAULT_MIN_CONFIDENCE,
+    MODEL_STRIDE,
+    UltralyticsPoseEstimator,
+    inference_size,
+)
 
 TS = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -106,3 +112,49 @@ def test_detection_only_result_has_no_keypoints(
 
     assert len(detections) == 1
     assert detections[0].keypoints is None
+
+
+def test_default_floor_lets_the_whole_rescue_band_through(
+    monkeypatch: pytest.MonkeyPatch, frame: Frame
+) -> None:
+    """The tracker's rescue pass needs every detection down to low_confidence.
+
+    A higher floor here silently discards the bottom of that band before the
+    tracker can use it.
+    """
+    estimator = make_estimator(monkeypatch, FakeResult(boxes=None, keypoints=None))
+
+    estimator.estimate(frame)
+
+    assert TrackingSettings(_env_file=None).low_confidence == DEFAULT_MIN_CONFIDENCE
+    assert estimator._model.predict_kwargs["conf"] == DEFAULT_MIN_CONFIDENCE
+
+
+class TestInferenceSize:
+    @pytest.mark.parametrize(
+        ("width", "height", "max_size", "expected"),
+        [
+            (1920, 1080, 1920, 1920),  # the backyard camera: run at native size
+            (1280, 720, 1920, 1280),  # smaller frame: no point upscaling past native
+            (1080, 1920, 1920, 1920),  # portrait: the longest side is the height
+            (3840, 2160, 1920, 1920),  # 4K: capped, or inference is too slow
+            (200, 100, 1920, 224),  # not a multiple of the stride: round up, never lose pixels
+            (2000, 1000, 1920, 1920),  # rounding up must not push past the cap
+        ],
+    )
+    def test_size_for_frame(self, width: int, height: int, max_size: int, expected: int) -> None:
+        assert inference_size(width, height, max_size) == expected
+
+    def test_size_is_always_a_stride_multiple(self) -> None:
+        for longest_side in range(MODEL_STRIDE, 2000, 7):
+            assert inference_size(longest_side, 10, 1920) % MODEL_STRIDE == 0
+
+
+def test_estimator_runs_near_native_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The 640 default detects nobody on the 1080p backyard footage."""
+    estimator = make_estimator(monkeypatch, FakeResult(boxes=None, keypoints=None))
+    full_hd = Frame(image=np.zeros((1080, 1920, 3), dtype=np.uint8), ts=TS, index=0)
+
+    estimator.estimate(full_hd)
+
+    assert estimator._model.predict_kwargs["imgsz"] == 1920

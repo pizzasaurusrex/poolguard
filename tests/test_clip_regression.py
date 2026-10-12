@@ -55,7 +55,9 @@ def estimator():  # type: ignore[no-untyped-def]
         "poolguard.vision.ultralytics_pose",
         reason="needs the vision extra: uv sync --extra vision",
     )
-    return ultralytics_pose.UltralyticsPoseEstimator()
+    return ultralytics_pose.UltralyticsPoseEstimator(
+        min_confidence=TrackingSettings().low_confidence
+    )
 
 
 def _replay(shot: ShotLabel, estimator) -> tuple[int, int]:  # type: ignore[no-untyped-def]
