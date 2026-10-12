@@ -9,7 +9,8 @@ This document explains *how* PoolGuard is built and *why* each significant
 decision was made. Requirements and success metrics live in the PRD; this
 document assumes them and records the architecture that satisfies them.
 Decisions are recorded as ADRs ([§3](#3-decision-records)) — new decisions get a new ADR; reversed
-decisions get a superseding ADR, never an edit.
+decisions get a superseding ADR, never an edit. Smaller dated decisions,
+findings and measurements go in the [decision log](./decision-log.md).
 
 ---
 

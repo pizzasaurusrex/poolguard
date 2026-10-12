@@ -2,47 +2,61 @@
 
 AI-based residential pool drowning detection: PoE camera + Raspberry Pi 5 with
 Hailo NPU running pose-based detection, tiered alerting (siren/push/HA/Twilio).
-See PRD.md for full requirements.
 
-## Decisions
+## Where things live
 
-- 2026-07-24: Hardware budget ≤ $500; target BOM ~$460 ([PRD §6](PRD.md#6-hardware)).
-- 2026-07-24: Compute = Pi 5 + AI HAT+ (Hailo) over Jetson Orin Nano — cost and ecosystem; Jetson kept as escape hatch since camera/alert layers are compute-agnostic.
-- 2026-07-24: v1 is above-water camera only; underwater camera (over-the-edge housing, no wall penetration) deferred to v2 for bottom-of-pool confirmation.
-- 2026-07-24: All inference on-device, no cloud — privacy, latency, siren must work without internet.
-- 2026-07-24: Sensitivity-biased tuning — accept ~1 false siren/week rather than risk missed detections; tiered alerts (watch/warn/emergency) manage alert fatigue.
-- 2026-07-24: Interpretable rules engine on top of pose+tracking, not end-to-end black-box classification.
-- 2026-07-24: Leaning custom Python pipeline (Pydantic-typed events) with Frigate only as companion NVR — still open, see [PRD §11](PRD.md#11-open-questions).
-- 2026-07-24: Language = Python 3.12+, uv for env/deps, hatchling build, src layout, ruff for lint. Heavy vision deps (opencv, ultralytics) isolated in a `vision` extra so dev machines stay light.
-- 2026-07-24: Pipeline stages communicate via frozen (immutable) Pydantic models in `events.py`; config validated at startup via pydantic-settings.
-- 2026-07-24: BOM buys the 26 TOPS AI HAT+ over 13 TOPS — $40 for pose-model headroom and a v2 second camera.
-- 2026-07-24: Repo is public from day one (building in public) at github.com/pizzasaurusrex/poolguard. MIT license; model weights are never committed — fetched from Hailo Model Zoo at install time, sidestepping the AGPL redistribution conflict (ADR-009 still governs the *recommended* model before P5). README carries a prominent safety disclaimer since the project is discoverable while unvalidated.
-- 2026-07-24: pydantic-settings composition pattern: nested sections are BaseSettings wired with `Field(default_factory=...)` so each reads its own `POOLGUARD_<SECTION>_*` env vars at construction (plain nesting silently bypasses child env machinery — caught as a real bug). Credentials in config use `SecretStr` (never plain str); all timestamps are `AwareDatetime`; settings classes are frozen like the event models.
-- 2026-07-28: Siren-as-primary-attention-grabber reopened after external feedback — loud-party swim mode can drown out audio; visual alert at the mount (strobe/LED/flag) under evaluation as the swim-mode channel ([PRD §11](PRD.md#11-open-questions)). v1 alert semantics stay "look at the pool" — no per-swimmer localization (backyard pools are covered by a single glance).
-- 2026-07-28: "Drowning doesn't look like drowning" documented as the core detection principle; distress-vs-treading-water is named the central discrimination problem ([PRD §5](PRD.md#5-system-overview)).
-- 2026-07-29: BOM cost assumptions annotated on ADR-001 — Pi 5 8GB street price ~$170-175 (vs $80 MSRP assumed), full BOM now ~$630-640; 26 vs 13 TOPS tradeoff reopened for the post-P0-benchmark review (not superseded, note only).
-- 2026-07-29: P0 buys the cost-minimized POC BOM (~$317, [POC-BOM.md](POC-BOM.md)) — camera and PoE injector deferred until P0 passes; bench test uses a free RTSP source (looped test footage preferred for reproducibility; Nest Cam via SDM API allowed on the bench only, never past P0 — ADR-002). Spend stays proportional to validated progress.
-- 2026-07-29: Software-first sequencing (ADR-010) — new hardware-free phase PD builds the pipeline on the dev machine (Ultralytics pose backend, video-file frame source, mock siren) before any hardware order; P0 narrows to Hailo validation. Inference is an explicit `PoseEstimator` protocol seam with Ultralytics (dev) and Hailo (Pi) backends.
-- 2026-07-29: Work proceeds in reviewable PRs on feature branches against `main` — no direct commits to main for substantive changes.
-- 2026-07-29: numpy promoted to a core dependency (Frame/pose seam types need it); cv2/ultralytics stay in the `vision` extra, and modules importing them live in files the core package never imports (`vision/video.py`, `vision/ultralytics_pose.py`) so protocol/model imports work without the extra.
-- 2026-07-29: Frame images are enforced read-only (`ndarray.setflags(write=False)` in a validator) to extend the immutability rule to pixel data.
-- 2026-07-30: Tracking = custom two-pass greedy-IoU tracker (`tracking.py`), not the `supervision` ByteTrack: ByteTrack's low-confidence rescue pass is kept (weak detections sustain tracks but never spawn them), Kalman motion model dropped (fixed camera, slow swimmers), and lost tracks are first-class output — a coasting track's `seconds_since_last_seen` is the submersion signal, which supervision's API doesn't expose. Association is strongest-IoU-first with one-to-one guards. Pure-function design: `advance(state, …) -> (new_state, people)`. `in_water` v0 = box center inside a config `pool_zone` rect.
-- 2026-07-31: Regression suite ground truth is labeled per *shot*, not per clip — multi-shot clips are split at cut boundaries first (a cut teleports everyone in frame and forces new track IDs, inflating fragmentation metrics for non-tracker reasons). Splitting is done manually: ffmpeg `scene` scores proved unreliable on pool footage, where a splash scores like a cut and a cut between similar poolside shots scores low (thresholds 0.2/0.3/0.4 gave 7/2/2 cuts on the same clip).
-- 2026-07-31: Labels live in a committed YAML manifest (`tests/labels/shots.yaml`, Pydantic-validated in `labels.py`) while footage stays gitignored — a shot whose file is absent locally *skips*, never fails, so a fresh checkout is green. Label granularity is shot-level verdict + onset window: firing late is a failure even when the verdict is right. PyYAML is a dev-only dep, so `labels.py` is never imported by the core pipeline (same isolation rule as the vision backends).
-- 2026-07-31: Shot labels enforce strict both-or-neither on `expected_event`/`onset_window` — a verdict with no timing is a half-finished label that would pass even if the rule fired 40s late, which is not a save. Windows narrower than `MIN_ONSET_WINDOW_SECONDS` (0.1s) are rejected as typos: they assert frame-level precision a human eyeballing a clip can't deliver, and would fail the rules engine for annotation jitter rather than for being wrong.
-- 2026-07-31: **Submersion is not detectable from a submerged-only clip.** First tracker run over the labeled library: the fully-submerged clip yields a 2% detection rate and *zero* tracks. The submersion rule works by a track existing and then coasting, so with no track ever spawned there is nothing to lose — no threshold value can rescue it. Submersion footage must show the person visible above water *first*, then going under. This makes a calm lead-in a hard requirement of the footage spec, not a nicety.
-- 2026-07-31: Detection rate, not association, is the dominant tracker variable in the POC library (det% ranges 2–100%). ID-per-person churn correlates inversely with det%: intermittent detection makes a reappearing swimmer fail IoU against a stale box and spawn a fresh ID. Fix detection before tuning association. Caveat on the numbers: `max_coast_seconds` (30 s) exceeds every clip length, so no track ever expires and ID counts read closer to cumulative spawns than concurrent people.
-- 2026-07-31: Found footage is cut for drama and always starts mid-event, so it cannot supply lead-in. Self-shot pool footage is promoted from a P2 nicety to the main PD gap.
-- 2026-07-31: `submersion_timeout_seconds` 15.0 → 12.0, **provisional and fitted to footage**: every POC clip shows its event from frame one (no calm lead-in), so earliest-possible-fire equals the rule threshold and a clip can only test its rule if duration > threshold. At 15 s *no* clip could exercise submersion (longest is 13.8 s). 12 s buys one testable positive with 1.7 s of runway. This number came from clip lengths, not from safety analysis — re-derive on P1 footage against the false-alarm budget before it ships.
-- 2026-07-31: Regression tests are opt-in behind a `regression` pytest marker (deselected by default via `addopts`) since they decode real video through a real pose model. `MAX_FRAGMENTATION` (track IDs ÷ real people) is an explicit tuning knob — loosening it is a regression that must be argued for in review.
-- 2026-07-24: Emergency-tier escalation via PagerDuty Free (Events API, family as responders) instead of hand-rolled Twilio ladder — free ack/retry/escalation logic plus critical-alert DND bypass on phones. ntfy stays for watch/warn tiers; Twilio demoted to fallback. Pending verification that free tier includes voice calls ([PRD §11](PRD.md#11-open-questions)).
-- 2026-08-25: **Input resolution is the dominant detection variable, not the water.** On real 1080p footage from the backyard camera, `yolo11n-pose` detects in 0.0% of frames at `imgsz=640`, 66% at 1280, and 87% at 1920 — subjects are 35–100px tall, so the default 640 downscale destroys them before the model runs. This is the mechanism behind the 2–100% detection spread logged on 2026-07-31. Any deployment must run inference near native resolution.
-- 2026-08-25: Tiled inference (overlapping crops at native scale) was benchmarked against full-frame upscaling and **rejected for now**. Aggregate numbers favored it (`tile4x2@512`: 93% vs 87% detection, 7.5 vs 6.4 fps), but visual verification showed the gain was mostly false positives: dappled tree shadow on deck pavers reads as person-shaped at small tile scale, plus duplicate boxes for one swimmer split across a tile seam. `detections/frame` is not a quality metric without ground-truth boxes — measure precision and recall before revisiting.
-- 2026-08-25: Shadow false positives are a false-*alarm* mechanism, not just noise: a phantom detection on static shadow spawns a track, the track later stops being detected, coasts, and fires the submersion rule. Precision failures cost user trust; recall failures cost a save. Both are budgeted.
-- 2026-08-25: Pool zone is a **polygon, not a rect**, and lives in a named `CameraProfile` in `tests/labels/shots.yaml` rather than on each `ShotLabel` — a fixed mount's geometry is declared once and referenced by name, so N clips from one camera don't duplicate 18 vertices. Shots with `camera: None` (all scraped footage) stay valid. The zone does two jobs: `crop_rect` (derived bounding box + margin) bounds inference for performance — 41% of frame, 59% of pixels skipped — while the polygon serves the `in_water` predicate, since this pool is kidney-shaped and its bounding box is ~a third deck.
-- 2026-08-25: SimpliSafe integration **not built** — camera clips download as MP4 from the web UI, so no auth/proxy/RTSP work is needed for the POC. SimpliSafe exposes no RTSP/ONVIF; the cloud FLV endpoint (older cams) and LiveKit/WebRTC (Outdoor Cam) exist but were scoped out as unnecessary. Motion-gated live streaming was considered for a zero-hardware POC and left open pending a measurement of stream session duration and re-trigger behavior.
-- 2026-10-11: Alert channels live in an `alerts/` package, one module per channel. ntfy (`alerts/ntfy.py`) splits a pure `build_message(SafetyEvent) -> NtfyMessage` from an `NtfyNotifier` that takes an injected `httpx.Client`, so message content is tested without a network and delivery is tested against `httpx.MockTransport`. httpx added as a core dependency for this. `ntfy_topic_url` is a `SecretStr` because the topic name is the only credential; delivery errors are raised `from None` since httpx embeds the request URL in its exception text.
-- 2026-10-11: PoolGuard gets its own ntfy topic, separate from the homecast monitoring topic, so pool alerts are not mixed with infrastructure noise and can carry their own notification settings. The topic is supplied only via `POOLGUARD_ALERT_NTFY_TOPIC_URL` (repo is public).
-- 2026-10-11: Pipeline liveness is reported through an Uptime Kuma push monitor on the homecast Pi (`alerts/heartbeat.py`). The pipeline pings; Kuma alerts when pings stop, so a crashed or hung detector is noticed without its cooperation. A failed ping raises `HeartbeatError` for the caller to log and continue: a monitoring outage must never stop detection. This is a health check with minutes of lag and an internet dependency, not an emergency channel.
-- 2026-10-11: Every settings section declares `env_file=".env"` and `extra="ignore"` itself (shared `_SECTION_CONFIG`). An env file declared only on the top-level `Settings` was never read by the nested sections, since each is its own `BaseSettings`: real env vars worked, `.env` silently did not. Same family as the 2026-07-24 nesting bug.
-- 2026-10-11: `poolguard-alert-test` sends one real notification through each configured alert channel and exits non-zero on failure. It loads `AlertSettings` alone so it runs without a camera configured.
+| Need | Read |
+|---|---|
+| Requirements, success criteria, open questions | [PRD.md](PRD.md) |
+| Architecture and ADRs (why each major choice was made) | [docs/architecture.md](docs/architecture.md) |
+| Dated decisions, findings and measurements | [docs/decision-log.md](docs/decision-log.md) |
+| Phase progress and what is next | [PLAN.md](PLAN.md) |
+| Footage requirements | [docs/footage-spec.md](docs/footage-spec.md) |
+| Hailo / NPU details | [docs/edge-inference.md](docs/edge-inference.md) |
+| Hardware | [BOM.md](BOM.md), [POC-BOM.md](POC-BOM.md) |
+
+Read the decision log before changing the tracker, detection settings, label
+schema, settings classes or alert channels: it records what was already tried
+and rejected.
+
+## Logging decisions
+
+- Append new decisions, findings and measurements to `docs/decision-log.md` as a dated entry.
+- Add a line to Standing rules below only when it changes how code gets written on a typical task. Keep it to one line; the reasoning stays in the log.
+- A reversed architectural decision gets a superseding ADR in `docs/architecture.md`.
+
+## Standing rules
+
+### Workflow
+
+- Work in feature branches and PRs against `main`; no direct commits to `main` for substantive changes.
+- The repo is public. Never commit secrets, ntfy topic URLs, model weights or footage. Weights are fetched at install time.
+- Python 3.12+, uv for env and deps, hatchling build, src layout, ruff for lint.
+
+### Design
+
+- All inference runs on-device. The siren path must work with the internet down.
+- Tuning is sensitivity-biased: a missed detection is worse than a false alarm (budget is about one false siren a week).
+- Detection logic is an interpretable rules engine over pose and tracking, with thresholds in config. No end-to-end classifier.
+- Inference sits behind the `PoseEstimator` protocol and frame input behind `FrameSource`. New backends and sources implement those seams.
+- Bench-only video sources (Nest, SimpliSafe) never become the production camera.
+
+### Code
+
+- Pipeline stages communicate through frozen Pydantic models in `events.py`. Settings classes are frozen too, and `Frame` pixel data is read-only.
+- All timestamps are `AwareDatetime`. Credentials are `SecretStr`, including the ntfy topic URL.
+- Each settings section is its own `BaseSettings`, wired into the parent with `Field(default_factory=...)`, reading `POOLGUARD_<SECTION>_*` and using the shared `_SECTION_CONFIG`. Plain nesting silently skips env vars and `.env`.
+- The core package never imports cv2, ultralytics or PyYAML. Code needing them lives in modules core does not import (`vision/video.py`, `vision/ultralytics_pose.py`, `labels.py`). A new optional dependency gets its own extra and its own isolated module.
+- The tracker is a pure function, `advance(state, …) -> (new_state, people)`. Coasting tracks are first-class output: `seconds_since_last_seen` is the submersion signal.
+- Alert channels are one module each under `alerts/`: a pure `build_message` plus a notifier taking an injected `httpx.Client`. Raise delivery errors `from None`, since httpx puts the request URL in its exception text.
+- A monitoring failure (heartbeat ping) is logged and detection continues.
+
+### Testing and tuning
+
+- Regression tests are behind the `regression` pytest marker and deselected by default; run them with `-m regression`. A shot whose footage is absent locally skips.
+- Labels are per shot in `tests/labels/shots.yaml`. `expected_event` and `onset_window` are set together or not at all. Camera geometry lives in a named `CameraProfile`, with the pool zone as a polygon.
+- Loosening `MAX_FRAGMENTATION` is a regression that must be argued for in review.
+- `submersion_timeout_seconds` (12.0) is provisional and was fitted to clip lengths. Re-derive it on real footage before it ships.
+- Run inference near native resolution: `imgsz=640` detects nothing on the 1080p backyard footage.
+- Submersion is only detectable if the person was tracked above water first, so test footage needs a calm lead-in.
+- `detections/frame` is not a quality metric. Measure precision and recall against ground-truth boxes.
