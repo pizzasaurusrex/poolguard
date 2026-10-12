@@ -1033,6 +1033,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+labels = [
+    { name = "pyyaml" },
+]
 vision = [
     { name = "opencv-python" },
     { name = "ultralytics" },
@@ -1053,9 +1056,10 @@ requires-dist = [
     { name = "opencv-python", marker = "extra == 'vision'", specifier = ">=4.10" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pydantic-settings", specifier = ">=2.3" },
+    { name = "pyyaml", marker = "extra == 'labels'", specifier = ">=6.0" },
     { name = "ultralytics", marker = "extra == 'vision'", specifier = ">=8.3" },
 ]
-provides-extras = ["vision"]
+provides-extras = ["vision", "labels"]
 
 [package.metadata.requires-dev]
 dev = [
