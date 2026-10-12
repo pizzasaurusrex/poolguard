@@ -82,3 +82,18 @@ def test_settings_are_frozen(camera_env: None) -> None:
         settings.rules = settings.rules  # type: ignore[misc]
     with pytest.raises(ValidationError):
         settings.rules.default_mode = OperatingMode.SWIM  # type: ignore[misc]
+
+
+def test_alert_urls_are_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Topic and push URLs are credentials, so they must not show up in a repr or log."""
+    monkeypatch.setenv("POOLGUARD_CAMERA_RTSP_URL", "rtsp://cam/stream")
+    monkeypatch.setenv("POOLGUARD_ALERT_NTFY_TOPIC_URL", "https://ntfy.example/secret-topic")
+    monkeypatch.setenv("POOLGUARD_ALERT_HEARTBEAT_PUSH_URL", "http://kuma.example/api/push/tok")
+
+    alerts = Settings(_env_file=None).alerts
+
+    assert "secret-topic" not in repr(alerts)
+    assert "tok" not in repr(alerts.heartbeat_push_url)
+    assert alerts.ntfy_topic_url is not None
+    assert alerts.ntfy_topic_url.get_secret_value() == "https://ntfy.example/secret-topic"
+    assert alerts.heartbeat_interval_seconds == 30.0

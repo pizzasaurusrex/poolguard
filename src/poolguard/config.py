@@ -98,7 +98,21 @@ class AlertSettings(BaseSettings):
     siren_gpio_pin: int | None = Field(
         default=None, description="BCM pin driving the siren relay; None disables"
     )
-    ntfy_topic_url: str | None = None
+    ntfy_topic_url: SecretStr | None = Field(
+        default=None,
+        description="Full ntfy topic URL. The topic name is the only secret, so it is "
+        "never logged; None disables the push channel",
+    )
+    heartbeat_push_url: SecretStr | None = Field(
+        default=None,
+        description="Uptime Kuma push-monitor URL, token included; None disables the heartbeat",
+    )
+    heartbeat_interval_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        description="Seconds between pings. Keep it under the monitor's own heartbeat "
+        "interval so one late ping does not read as an outage",
+    )
     mqtt_host: str | None = None
     escalation_ack_timeout_seconds: float = Field(default=30.0, gt=0)
 
