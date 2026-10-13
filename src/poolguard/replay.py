@@ -1,16 +1,17 @@
 """Replay: run the detection pipeline over a FrameSource offline.
 
-This is the PD-phase test harness (ADR-010): the same loop later gains
-tracking and rules stages. It depends only on the seam protocols, so tests
-drive it with fakes and the CLI drives it with real backends.
+This is the PD-phase test harness (ADR-010): detect, then track, then rules.
+It depends only on the seam protocols, so tests drive it with fakes and the
+CLI drives it with real backends.
 """
 
 from collections.abc import Iterator
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from poolguard.config import TrackingSettings
-from poolguard.events import Detection, TrackedPerson
+from poolguard.config import RulesSettings, TrackingSettings
+from poolguard.events import Detection, SafetyEvent, TrackedPerson
+from poolguard.rules import RulesState, evaluate
 from poolguard.tracking import TrackerState, advance
 from poolguard.vision.frames import FrameSource
 from poolguard.vision.pose import PoseEstimator
@@ -50,7 +51,7 @@ def run_replay(source: FrameSource, estimator: PoseEstimator) -> Iterator[FrameR
 
 
 class TrackedFrameResult(BaseModel):
-    """Tracked people (including coasting tracks) for one replayed frame."""
+    """Tracked people (including coasting tracks) and any events raised on one frame."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -58,23 +59,32 @@ class TrackedFrameResult(BaseModel):
     ts: AwareDatetime
     detections: tuple[Detection, ...]
     people: tuple[TrackedPerson, ...]
+    events: tuple[SafetyEvent, ...] = ()
 
 
 def run_tracked_replay(
-    source: FrameSource, estimator: PoseEstimator, settings: TrackingSettings
+    source: FrameSource,
+    estimator: PoseEstimator,
+    settings: TrackingSettings,
+    rules: RulesSettings | None = None,
 ) -> Iterator[TrackedFrameResult]:
-    """run_replay with the tracking stage folded in.
+    """run_replay with the tracking and rules stages folded in.
 
-    The frame timestamp is the tracker's clock, so replay behaves identically
-    at any processing speed — coasting timers measure video time, not
-    wall-clock time.
+    The frame timestamp is the clock for both stages, so replay behaves
+    identically at any processing speed — coasting timers and rule timeouts
+    measure video time, not wall-clock time. The operating mode is the
+    rules settings' default_mode.
     """
-    state = TrackerState()
+    rules = rules or RulesSettings()
+    tracker_state = TrackerState()
+    rules_state = RulesState()
     for result in run_replay(source, estimator):
-        state, people = advance(state, result.detections, result.ts, settings)
+        tracker_state, people = advance(tracker_state, result.detections, result.ts, settings)
+        rules_state, events = evaluate(rules_state, people, result.ts, rules.default_mode, rules)
         yield TrackedFrameResult(
             frame_index=result.frame_index,
             ts=result.ts,
             detections=result.detections,
             people=people,
+            events=events,
         )

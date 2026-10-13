@@ -28,6 +28,11 @@ class VideoFileFrameSource:
         if not self._path.is_file():
             raise FileNotFoundError(f"video file not found: {self._path}")
 
+    @property
+    def start_time(self) -> AwareDatetime:
+        """Timestamp given to the first frame."""
+        return self._start_time
+
     def frames(self) -> Iterator[Frame]:
         capture = cv2.VideoCapture(str(self._path))
         if not capture.isOpened():
