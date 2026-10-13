@@ -45,8 +45,9 @@ Work happens in reviewable PRs against `main`.
       "distress" clip for rule smoke tests
 - [x] Tracking (ByteTrack-style two-pass IoU, custom) over pose detections —
       `tracking.py`, `--track` on poolguard-replay (PR 5)
-- [ ] Rules engine v0: distress / submersion / entry over track histories
-      (thresholds in config)
+- [~] Rules engine v0: distress / submersion / entry over track histories
+      (thresholds in config). Submersion landed (`rules.py`, runs under
+      `--track`); distress and entry are not written
       - **Resolved (provisional): submersion timeout 15 s → 12 s** so the POC
         clip library can exercise the rule at all. Fitted to footage, not
         derived from safety — must be re-derived on real P1 footage against
@@ -63,8 +64,9 @@ Work happens in reviewable PRs against `main`.
 - [~] Replay-harness regression suite over labeled clips — schema, manifest and
       harness landed (`labels.py`, `tests/labels/shots.yaml`,
       `tests/test_clip_regression.py`, `-m regression`). Tracker assertions
-      (miss + fragmentation) active; event assertions wire up with the rules
-      engine.
+      (miss + fragmentation) and event assertions (verdict + onset window)
+      are both active. No labeled shot is a positive yet: the backyard clips
+      are all too short for the 12 s submersion rule to conclude.
 - [x] Annotated replay HUD (`vision/hud.py`): per-frame clock, live/coasting
       counts, running detection rate, a submersion meter filling toward the
       timeout, the label's expected event, and a priority status line.
