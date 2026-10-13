@@ -178,3 +178,8 @@ class TestEventsOnLabeledShots:
             f"{shot.shot}: expected {shot.expected_event.value} between {start}s and {end}s, "
             f"raised: {raised or 'nothing'}"
         )
+        # An alarm outside the window is a false alarm even on a clip that has a real event.
+        outside_window = [e for e in replay.events if not start <= e.seconds_in <= end]
+        assert not outside_window, (
+            f"{shot.shot}: event outside the {start}s to {end}s onset window; raised: {raised}"
+        )
