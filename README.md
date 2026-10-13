@@ -177,6 +177,31 @@ configured channel fails. No camera or vision extra is needed.
 POOLGUARD_CAMERA_RTSP_URL=rtsp://user:pass@cam/h264Preview_01_main uv run poolguard-benchmark
 ```
 
+## Check that the camera has not moved
+
+The pool zone is traced for one camera angle. If the camera is re-mounted the
+outline no longer sits on the water, and nothing else would notice. Record the
+view's fixed landmarks once, right after tracing the zone, then check any later
+recording against them:
+
+```sh
+uv sync --extra vision --extra labels
+uv run poolguard-view-check save --video clips/today.mp4 \
+    --reference calibration/backyard.viewref.npz \
+    --labels tests/labels/shots.yaml --camera backyard_simplisafe
+uv run poolguard-view-check check --video clips/later.mp4 \
+    --reference calibration/backyard.viewref.npz \
+    --labels tests/labels/shots.yaml --camera backyard_simplisafe
+```
+
+`check` prints `aligned`, `moved` or `unknown`. Anything but `aligned` prints a
+`system_degraded` event and exits non-zero. Without `--labels` and `--camera`
+the zone comes from `POOLGUARD_TRACKING_POOL_ZONE`.
+
+The reference file holds landmark positions and descriptors, not a picture,
+but it still describes a private scene: `calibration/` is gitignored and the
+file should never be committed.
+
 ## Layout
 
 ```
@@ -184,6 +209,7 @@ src/poolguard/
   events.py      # immutable Pydantic models passed between pipeline stages
   config.py      # validated runtime settings (env / .env)
   tracking.py    # greedy box-overlap tracker: Detections -> persistent TrackedPerson tracks
+  camera_view.py # verdict on whether the camera still sees the traced view, and its alert
   replay.py      # offline pipeline loop over a FrameSource (PD test harness)
   labels.py      # schema for the shot-label manifest (dev only, needs PyYAML)
   vision/        # frame + pose seams: protocols, video-file source, Ultralytics backend,
