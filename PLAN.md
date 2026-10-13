@@ -90,6 +90,11 @@ Work happens in reviewable PRs against `main`.
       `in_water` is a point-in-polygon test; `poolguard-replay --labels`
       applies the shot's camera profile. Not yet checked against real
       backyard footage
+- [ ] Pool zone survives a camera re-mount: the outline is traced for one
+      angle and the battery camera moves every time it is charged
+      ([#23](https://github.com/pizzasaurusrex/poolguard/issues/23))
+- [ ] Jump-in false alarm: the track left at the pool edge when a swimmer
+      jumps in times out as a submersion (seen on `drowning-test.mp4`)
 - [ ] Local RTSP loop via mediamtx to exercise ingest/reconnect path
 - [ ] PagerDuty Free signup + escalation drill — resolves ADR-006's named
       condition (voice calls on free tier?) with zero hardware
