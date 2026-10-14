@@ -30,7 +30,7 @@ and rejected.
 ### Workflow
 
 - Work in feature branches and PRs against `main`; no direct commits to `main` for substantive changes.
-- The repo is public. Never commit secrets, ntfy topic URLs, model weights or footage. Weights are fetched at install time.
+- The repo is public. Never commit secrets, ntfy topic URLs, model weights, footage or camera view references. Weights are fetched at install time.
 - Python 3.12+, uv for env and deps, hatchling build, src layout, ruff for lint.
 
 ### Design

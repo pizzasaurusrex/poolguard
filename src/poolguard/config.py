@@ -136,6 +136,32 @@ class AlertSettings(BaseSettings):
     escalation_ack_timeout_seconds: float = Field(default=30.0, gt=0)
 
 
+class ViewSettings(BaseSettings):
+    """Thresholds for deciding whether the camera still sees what the pool zone was traced for."""
+
+    model_config = SettingsConfigDict(env_prefix="POOLGUARD_VIEW_", **_SECTION_CONFIG)
+
+    min_landmarks: int = Field(
+        default=20,
+        ge=4,
+        description="Fewest matching landmarks that can vouch for the view; fewer reads as "
+        "unknown, which is treated as untrusted",
+    )
+    min_landmark_spread: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Matching landmarks must span at least this share of the frame in both "
+        "directions, so a burned-in logo or timestamp cannot vouch for the whole view",
+    )
+    max_zone_shift: float = Field(
+        default=0.02,
+        gt=0.0,
+        description="Largest movement of any pool-zone vertex, as a fraction of frame width, "
+        "that still counts as aligned",
+    )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(**_SECTION_CONFIG)
 
@@ -143,3 +169,4 @@ class Settings(BaseSettings):
     tracking: TrackingSettings = Field(default_factory=TrackingSettings)
     rules: RulesSettings = Field(default_factory=RulesSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
+    view: ViewSettings = Field(default_factory=ViewSettings)
