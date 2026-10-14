@@ -93,6 +93,51 @@ cameras:
       - [0.222, 0.370]
       - [0.208, 0.393]
 
+  backyard_simplisafe_remount:
+    notes: >-
+      The same SimpliSafe camera after it was taken down to charge and put back
+      (first seen 2026-10-13 in drowning-test.mp4). The view is shifted and
+      zoomed compared with backyard_simplisafe, so that outline no longer fits;
+      see issue #23. Traced from a median frame of drowning-test.mp4 with the
+      pool cover half on: the colour mask hugs the waterline at the left, right
+      and near edges, and the far edge under the piled-up cover is a straight
+      line between the visible waterline on each side. The covered part counts
+      as pool, because someone can end up under a cover.
+    crop_margin: 0.05
+    water_polygon:
+      - [0.192, 0.595]
+      - [0.205, 0.620]
+      - [0.232, 0.647]
+      - [0.293, 0.671]
+      - [0.368, 0.673]
+      - [0.426, 0.653]
+      - [0.430, 0.644]
+      - [0.515, 0.642]
+      - [0.668, 0.687]
+      - [0.743, 0.691]
+      - [0.797, 0.671]
+      - [0.842, 0.619]
+      - [0.844, 0.563]
+      - [0.854, 0.535]
+      - [0.901, 0.508]
+      - [0.908, 0.499]
+      - [0.908, 0.481]
+      - [0.883, 0.438]
+      - [0.855, 0.403]
+      - [0.813, 0.382]
+      - [0.750, 0.378]
+      - [0.695, 0.382]
+      - [0.586, 0.386]
+      - [0.484, 0.392]
+      - [0.359, 0.394]
+      - [0.268, 0.437]
+      - [0.264, 0.459]
+      - [0.251, 0.465]
+      - [0.228, 0.498]
+      - [0.227, 0.518]
+      - [0.214, 0.547]
+      - [0.204, 0.548]
+
 shots:
   - shot: adult-exits.MP4
     source: adult-exits.MP4
@@ -128,3 +173,12 @@ shots:
     people: 3
     camera: backyard_simplisafe
     notes: "Three swimmers. One on the pool deck and two in the water. One swimmer is in the bottom corner of the pool and difficult to see at the edge."
+
+  - shot: drowning-test.mp4
+    source: drowning-test.mp4
+    duration_seconds: 39.87
+    people: 1
+    camera: backyard_simplisafe_remount
+    notes: "One swimmer in the pool. The swimmer appears to be struggling and goes under at the 24 second mark. The swimmer remains under water for the remainder of the clip."
+    expected_event: submersion
+    onset_window: [34.0, 39.0]
