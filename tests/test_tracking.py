@@ -12,7 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from poolguard.config import TrackingSettings
-from poolguard.events import BoundingBox, Detection
+from poolguard.events import BoundingBox, Detection, TrackedPerson
 from poolguard.geometry import WHOLE_FRAME
 from poolguard.tracking import TrackerState, advance, containment, iou
 
@@ -180,9 +180,10 @@ class TestBoxShapeChange:
 
     def test_long_unseen_track_is_not_adopted_by_a_covering_box(self) -> None:
         """Safety: a newcomer's big box must not reset a submerged person's clock."""
-        state, _ = advance(TrackerState(), (det(0.32, 0.08, **self.HEAD),), START, SETTINGS)
-        later = START + timedelta(seconds=SETTINGS.containment_window_seconds + 1.0)
-        state, people = advance(state, (det(0.3, 0.07, ts=later, **self.BODY),), later, SETTINGS)
+        settings = SETTINGS.model_copy(update={"handoff_window_seconds": 0.0})
+        state, _ = advance(TrackerState(), (det(0.32, 0.08, **self.HEAD),), START, settings)
+        later = START + timedelta(seconds=settings.containment_window_seconds + 1.0)
+        state, people = advance(state, (det(0.3, 0.07, ts=later, **self.BODY),), later, settings)
 
         assert sorted(p.track_id for p in people) == [1, 2]
         coasting = next(p for p in people if p.track_id == 1)
@@ -198,6 +199,118 @@ class TestBoxShapeChange:
         state, people = advance(state, detections, later, SETTINGS)
 
         assert sorted(p.track_id for p in people) == [1, 2]
+
+
+class TestHandOff:
+    """A person who vanishes for a moment and reappears nearby keeps their ID.
+
+    Jumping in: the standing box is lost mid-entry, the swimmer is under for a
+    couple of seconds, then surfaces as a small head box about one body width
+    away. Without a hand-off the standing box is left as a ghost that times
+    out as a submersion.
+    """
+
+    STANDING = {"width": 0.04, "height": 0.15}
+    HEAD = {"width": 0.04, "height": 0.05}
+
+    def _lost_then_seen(
+        self,
+        settings: TrackingSettings,
+        gap_seconds: float,
+        reappearance: Detection,
+    ) -> tuple[TrackedPerson, ...]:
+        state, _ = advance(TrackerState(), (det(0.80, 0.35, **self.STANDING),), START, settings)
+        later = START + timedelta(seconds=gap_seconds)
+        _, people = advance(state, (reappearance,), later, settings)
+        return people
+
+    def test_swimmer_surfacing_near_where_they_went_in_keeps_their_id(self) -> None:
+        later = START + timedelta(seconds=2.0)
+        surfacing = det(0.74, 0.42, ts=later, **self.HEAD)
+        people = self._lost_then_seen(SETTINGS, 2.0, surfacing)
+
+        assert [p.track_id for p in people] == [1]
+        assert people[0].seconds_since_last_seen == 0.0
+        assert people[0].detection == surfacing
+
+    def test_track_lost_longer_than_the_window_is_not_handed_off(self) -> None:
+        """Safety: someone under for longer must not have their clock reset."""
+        gap = SETTINGS.handoff_window_seconds + 1.0
+        later = START + timedelta(seconds=gap)
+        people = self._lost_then_seen(SETTINGS, gap, det(0.74, 0.42, ts=later, **self.HEAD))
+
+        assert sorted(p.track_id for p in people) == [1, 2]
+        lost = next(p for p in people if p.track_id == 1)
+        assert lost.seconds_since_last_seen == pytest.approx(gap)
+
+    def test_detection_too_far_away_is_a_new_person(self) -> None:
+        # The standing box's longer side is 0.15, so 0.5 away is over three box lengths.
+        later = START + timedelta(seconds=1.0)
+        people = self._lost_then_seen(SETTINGS, 1.0, det(0.30, 0.35, ts=later, **self.HEAD))
+
+        assert sorted(p.track_id for p in people) == [1, 2]
+
+    def test_distance_limit_scales_with_the_lost_box(self) -> None:
+        """A far-off person is small on screen, so their limit is small too."""
+        settings = SETTINGS.model_copy(update={"handoff_max_distance": 1.0})
+        small = {"width": 0.02, "height": 0.04}
+        state, _ = advance(TrackerState(), (det(0.50, 0.20, **small),), START, settings)
+        later = START + timedelta(seconds=1.0)
+        # 0.06 away: within one standing-box length, but three of this person's.
+        _, people = advance(state, (det(0.56, 0.20, ts=later, **small),), later, settings)
+
+        assert sorted(p.track_id for p in people) == [1, 2]
+
+    def test_low_confidence_detection_is_never_handed_off(self) -> None:
+        """Splash noise must not reset a submerged person's clock."""
+        later = START + timedelta(seconds=2.0)
+        splash = det(0.74, 0.42, confidence=0.3, ts=later, **self.HEAD)
+        people = self._lost_then_seen(SETTINGS, 2.0, splash)
+
+        assert [p.track_id for p in people] == [1]
+        assert people[0].seconds_since_last_seen == pytest.approx(2.0)
+
+    def test_visible_person_is_not_handed_a_lost_track(self) -> None:
+        """Someone still being tracked keeps their own ID, even beside a lost track."""
+        state, _ = advance(
+            TrackerState(),
+            (det(0.80, 0.35, **self.STANDING), det(0.70, 0.40, **self.HEAD)),
+            START,
+            SETTINGS,
+        )
+        later = START + timedelta(seconds=1.0)
+        _, people = advance(state, (det(0.70, 0.40, ts=later, **self.HEAD),), later, SETTINGS)
+
+        by_id = {p.track_id: p for p in people}
+        assert sorted(by_id) == [1, 2]
+        assert by_id[1].seconds_since_last_seen == pytest.approx(1.0)
+        assert by_id[2].seconds_since_last_seen == 0.0
+
+    def test_one_lost_track_goes_to_one_detection_and_the_nearest_wins(self) -> None:
+        later = START + timedelta(seconds=1.0)
+        state, _ = advance(TrackerState(), (det(0.80, 0.35, **self.STANDING),), START, SETTINGS)
+        near = det(0.78, 0.40, ts=later, **self.HEAD)
+        farther = det(0.86, 0.45, ts=later, **self.HEAD)
+        _, people = advance(state, (farther, near), later, SETTINGS)
+
+        by_id = {p.track_id: p for p in people}
+        assert sorted(by_id) == [1, 2]
+        assert by_id[1].detection == near
+
+    def test_two_people_lost_together_come_back_as_two(self) -> None:
+        """IDs may swap, but nobody is gained or lost: the headcount holds."""
+        state, _ = advance(
+            TrackerState(),
+            (det(0.20, 0.35, **self.STANDING), det(0.60, 0.35, **self.STANDING)),
+            START,
+            SETTINGS,
+        )
+        later = START + timedelta(seconds=2.0)
+        surfacing = (det(0.22, 0.42, ts=later, **self.HEAD), det(0.58, 0.42, ts=later, **self.HEAD))
+        _, people = advance(state, surfacing, later, SETTINGS)
+
+        assert sorted(p.track_id for p in people) == [1, 2]
+        assert all(p.seconds_since_last_seen == 0.0 for p in people)
 
 
 class TestLowConfidenceRescue:

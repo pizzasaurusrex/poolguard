@@ -5,7 +5,7 @@ choice that matters for safety: a track that stops matching is *not* deleted —
 it coasts, and its seconds_since_last_seen keeps growing. A coasting track
 inside the pool zone is the raw signal for the submersion rule.
 
-Association is three greedy passes:
+Association is four greedy passes:
   pass 1: high-confidence detections vs all live tracks, by IoU
   pass 2: high-confidence detections still unmatched vs tracks seen within
           the last containment_window_seconds, by containment — the model's
@@ -14,6 +14,10 @@ Association is three greedy passes:
   pass 3: low-confidence detections vs tracks still unmatched, by IoU (the
           "rescue" pass — a weak detection where a track already was is
           almost certainly still that person)
+  pass 4: high-confidence detections still unmatched vs tracks lost within
+          the last handoff_window_seconds, by distance in box lengths (the
+          "hand-off" pass — a swimmer who jumps in vanishes for a couple of
+          seconds and surfaces nearby with a box of a different shape)
 Only unmatched high-confidence detections spawn new tracks; low-confidence
 ones never do, so splash noise cannot create phantom people.
 
@@ -21,6 +25,7 @@ The tracker itself is a pure function: advance(state, ...) returns a new
 state, so replay and tests can fold it like ReplaySummary.
 """
 
+import math
 from collections.abc import Callable
 from typing import NamedTuple
 
@@ -76,6 +81,22 @@ def containment(a: BoundingBox, b: BoundingBox) -> float:
     """
     smaller_area = min(a.width * a.height, b.width * b.height)
     return _intersection_area(a, b) / smaller_area
+
+
+def handoff_distance(lost: BoundingBox, candidate: BoundingBox) -> float:
+    """Centre-to-centre distance in lengths of the lost box's longer side.
+
+    Measured in the lost person's own size so the same limit means about the
+    same real distance near the camera and across the pool.
+    """
+    dx = (candidate.x + candidate.width / 2) - (lost.x + lost.width / 2)
+    dy = (candidate.y + candidate.height / 2) - (lost.y + lost.height / 2)
+    return math.hypot(dx, dy) / max(lost.width, lost.height)
+
+
+def _nearness(lost: BoundingBox, candidate: BoundingBox) -> float:
+    # Negated so match_greedy, which keeps the highest scores, keeps the nearest.
+    return -handoff_distance(lost, candidate)
 
 
 BoxScore = Callable[[BoundingBox, BoundingBox], float]
@@ -175,25 +196,58 @@ def advance(
     )
 
     rescue = _associate(still_unmatched, low, settings.iou_min)
+    handoff = _hand_off(rescue.unmatched_tracks, by_containment.unmatched_detections, now, settings)
 
     updated = tuple(
         _touch(track, detection, now)
-        for track, detection in by_overlap.matched + by_containment.matched + rescue.matched
+        for track, detection in by_overlap.matched
+        + by_containment.matched
+        + rescue.matched
+        + handoff.matched
     )
     coasting = tuple(
         track
-        for track in rescue.unmatched_tracks
+        for track in handoff.unmatched_tracks
         if _seconds_unseen(track, now) <= settings.max_coast_seconds
     )
     spawned = tuple(
         Track(track_id=state.next_track_id + offset, last_detection=detection, last_seen_ts=now)
-        for offset, detection in enumerate(by_containment.unmatched_detections)
+        for offset, detection in enumerate(handoff.unmatched_detections)
     )
 
     tracks = updated + coasting + spawned
     new_state = TrackerState(next_track_id=state.next_track_id + len(spawned), tracks=tracks)
     people = tuple(_to_person(track, now, settings) for track in tracks)
     return new_state, people
+
+
+def _hand_off(
+    unmatched_tracks: tuple[Track, ...],
+    newcomers: tuple[Detection, ...],
+    now: AwareDatetime,
+    settings: TrackingSettings,
+) -> _Association:
+    """Give a recently lost track to the nearest would-be newcomer.
+
+    Only high-confidence detections that matched nothing else arrive here, so
+    a visible person keeps their own track and splash noise cannot reset a
+    lost person's clock. The returned unmatched tracks include the ones too
+    old to be eligible, so the caller sees every track that is still lost.
+    """
+    eligible = tuple(
+        track
+        for track in unmatched_tracks
+        if _seconds_unseen(track, now) <= settings.handoff_window_seconds
+    )
+    result = _associate(eligible, newcomers, -settings.handoff_max_distance, _nearness)
+    taken_ids = {track.track_id for track, _ in result.matched}
+    return _Association(
+        matched=result.matched,
+        unmatched_tracks=tuple(
+            track for track in unmatched_tracks if track.track_id not in taken_ids
+        ),
+        unmatched_detections=result.unmatched_detections,
+    )
 
 
 def _touch(track: Track, detection: Detection, now: AwareDatetime) -> Track:
