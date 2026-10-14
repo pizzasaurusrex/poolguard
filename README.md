@@ -122,7 +122,11 @@ in the [decision log](docs/decision-log.md).
 ## Try it: tracking and annotated replay
 
 Add `--track` to run detections through the tracking stage (persistent IDs,
-low-confidence "rescue" matching, coasting through brief detector dropouts):
+low-confidence "rescue" matching, coasting through brief detector dropouts)
+and the rules engine. Each event the rules raise is printed as an `EVENT`
+line with its time into the clip, and the summary ends with an event count.
+Today the only rule is submersion: a person last seen in the water who stays
+unseen for 12 s.
 
 ```sh
 uv run poolguard-replay --video path/to/clip.mp4 --track --per-frame
@@ -210,6 +214,7 @@ src/poolguard/
   config.py      # validated runtime settings (env / .env)
   tracking.py    # greedy box-overlap tracker: Detections -> persistent TrackedPerson tracks
   camera_view.py # verdict on whether the camera still sees the traced view, and its alert
+  rules.py       # rules engine: TrackedPerson tracks -> SafetyEvents (submersion so far)
   replay.py      # offline pipeline loop over a FrameSource (PD test harness)
   labels.py      # schema for the shot-label manifest (dev only, needs PyYAML)
   vision/        # frame + pose seams: protocols, video-file source, Ultralytics backend,
