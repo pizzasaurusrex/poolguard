@@ -34,6 +34,7 @@ poolguard = "poolguard.main:main"
 poolguard-alert-test = "poolguard.scripts.alert_test:main"
 poolguard-benchmark = "poolguard.scripts.benchmark_fps:main"
 poolguard-replay = "poolguard.scripts.replay:main"
+poolguard-view-check = "poolguard.scripts.view_check:main"
 
 [build-system]
 requires = ["hatchling"]
