@@ -67,6 +67,19 @@ class TrackingSettings(BaseSettings):
         "Kept short on purpose: a newcomer's large box must not adopt, and so reset the "
         "unseen clock of, someone who has been under for longer",
     )
+    handoff_window_seconds: float = Field(
+        default=3.0,
+        ge=0.0,
+        description="A detection that would start a new track instead takes over a track lost "
+        "within this long, if it is close enough (a swimmer jumping in and surfacing). The "
+        "safety limit: someone unseen for longer keeps their clock, whoever appears nearby",
+    )
+    handoff_max_distance: float = Field(
+        default=1.5,
+        ge=0.0,
+        description="Furthest a hand-off can reach, in lengths of the lost track's box (its "
+        "longer side), so the limit shrinks for people far from the camera",
+    )
     max_coast_seconds: float = Field(
         default=30.0,
         gt=0,
