@@ -40,6 +40,7 @@ poolguard-benchmark = "poolguard.scripts.benchmark_fps:main"
 poolguard-replay = "poolguard.scripts.replay:main"
 poolguard-simplisafe-login = "poolguard.scripts.simplisafe_login:main"
 poolguard-simplisafe-watch = "poolguard.scripts.simplisafe_watch:main"
+poolguard-view-check = "poolguard.scripts.view_check:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -16,3 +16,6 @@ clips/
 *.pt
 runs/
 .DS_Store
+# camera view references describe a private scene; never committed
+calibration/
+*.viewref.npz

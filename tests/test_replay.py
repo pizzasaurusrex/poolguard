@@ -105,3 +105,35 @@ def test_frame_result_is_frozen() -> None:
 
     with pytest.raises(ValidationError):
         result.frame_index = 1  # type: ignore[misc]
+
+
+class VanishingPersonEstimator:
+    """One person visible for the first two frames, then never again."""
+
+    def estimate(self, frame: Frame) -> tuple[Detection, ...]:
+        if frame.index >= 2:
+            return ()
+        return (
+            Detection(
+                frame_ts=frame.ts,
+                box=BoundingBox(x=0.4, y=0.4, width=0.2, height=0.3),
+                confidence=0.9,
+            ),
+        )
+
+
+def test_tracked_replay_raises_submersion_once_when_the_timeout_passes() -> None:
+    from poolguard.config import RulesSettings, TrackingSettings
+    from poolguard.events import EventType
+    from poolguard.replay import run_tracked_replay
+
+    source = ListFrameSource(make_frames(18))  # one frame per second
+    rules = RulesSettings(_env_file=None, submersion_timeout_seconds=12.0)
+
+    results = list(
+        run_tracked_replay(source, VanishingPersonEstimator(), TrackingSettings(), rules)
+    )
+
+    raised = [(r.frame_index, e.event_type) for r in results for e in r.events]
+    # Last seen on frame 1 (t=1s), so 12s unseen is reached on frame 13.
+    assert raised == [(13, EventType.SUBMERSION)]

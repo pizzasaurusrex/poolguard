@@ -76,7 +76,7 @@ def main() -> None:
         help="cap on the model input size in pixels; lower is faster but misses distant people",
     )
     parser.add_argument("--per-frame", action="store_true", help="print each frame's detections")
-    parser.add_argument("--track", action="store_true", help="run the tracking stage")
+    parser.add_argument("--track", action="store_true", help="run the tracking and rules stages")
     parser.add_argument(
         "--render", metavar="OUT_MP4", help="write an annotated video (implies --track)"
     )
@@ -108,6 +108,7 @@ def main() -> None:
 
     summary = ReplaySummary()
     track_ids: set[int] = set()
+    event_count = 0
     start = time.monotonic()
 
     if args.track:
@@ -122,6 +123,13 @@ def main() -> None:
         for tracked in tracked_results:
             summary = summary.fold(tracked)
             track_ids.update(p.track_id for p in tracked.people)
+            for event in tracked.events:
+                event_count += 1
+                seconds_in = (tracked.ts - source.start_time).total_seconds()
+                print(
+                    f"EVENT t={seconds_in:.1f}s {event.tier.value} {event.event_type.value} "
+                    f"track #{event.track_id}: {event.detail}"
+                )
             if args.per_frame:
                 people = ", ".join(_describe(p) for p in tracked.people)
                 print(f"frame {tracked.frame_index:5d}  tracks=[{people}]")
@@ -139,7 +147,7 @@ def main() -> None:
         raise SystemExit(f"no frames decoded from {args.video}")
 
     fps = summary.frames / elapsed if elapsed > 0 else 0.0
-    tracks = f" tracks={len(track_ids)}" if args.track else ""
+    tracks = f" tracks={len(track_ids)} events={event_count}" if args.track else ""
     print(
         f"frames={summary.frames} frames_with_people={summary.frames_with_people} "
         f"detections={summary.detections}{tracks} elapsed={elapsed:.1f}s fps={fps:.1f}"

@@ -69,6 +69,19 @@ class TrackingSettings(BaseSettings):
         "Kept short on purpose: a newcomer's large box must not adopt, and so reset the "
         "unseen clock of, someone who has been under for longer",
     )
+    handoff_window_seconds: float = Field(
+        default=3.0,
+        ge=0.0,
+        description="A detection that would start a new track instead takes over a track lost "
+        "within this long, if it is close enough (a swimmer jumping in and surfacing). The "
+        "safety limit: someone unseen for longer keeps their clock, whoever appears nearby",
+    )
+    handoff_max_distance: float = Field(
+        default=1.5,
+        ge=0.0,
+        description="Furthest a hand-off can reach, in lengths of the lost track's box (its "
+        "longer side), so the limit shrinks for people far from the camera",
+    )
     max_coast_seconds: float = Field(
         default=30.0,
         gt=0,
@@ -175,6 +188,32 @@ class SimpliSafeSettings(BaseSettings):
         return self
 
 
+class ViewSettings(BaseSettings):
+    """Thresholds for deciding whether the camera still sees what the pool zone was traced for."""
+
+    model_config = SettingsConfigDict(env_prefix="POOLGUARD_VIEW_", **_SECTION_CONFIG)
+
+    min_landmarks: int = Field(
+        default=20,
+        ge=4,
+        description="Fewest matching landmarks that can vouch for the view; fewer reads as "
+        "unknown, which is treated as untrusted",
+    )
+    min_landmark_spread: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Matching landmarks must span at least this share of the frame in both "
+        "directions, so a burned-in logo or timestamp cannot vouch for the whole view",
+    )
+    max_zone_shift: float = Field(
+        default=0.02,
+        gt=0.0,
+        description="Largest movement of any pool-zone vertex, as a fraction of frame width, "
+        "that still counts as aligned",
+    )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(**_SECTION_CONFIG)
 
@@ -183,3 +222,4 @@ class Settings(BaseSettings):
     rules: RulesSettings = Field(default_factory=RulesSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
     simplisafe: SimpliSafeSettings = Field(default_factory=SimpliSafeSettings)
+    view: ViewSettings = Field(default_factory=ViewSettings)

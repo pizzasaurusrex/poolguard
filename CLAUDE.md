@@ -30,7 +30,7 @@ and rejected.
 ### Workflow
 
 - Work in feature branches and PRs against `main`; no direct commits to `main` for substantive changes.
-- The repo is public. Never commit secrets, ntfy topic URLs, model weights or footage. Weights are fetched at install time.
+- The repo is public. Never commit secrets, ntfy topic URLs, model weights, footage or camera view references. Weights are fetched at install time.
 - Python 3.12+, uv for env and deps, hatchling build, src layout, ruff for lint.
 
 ### Design
@@ -48,6 +48,7 @@ and rejected.
 - Each settings section is its own `BaseSettings`, wired into the parent with `Field(default_factory=...)`, reading `POOLGUARD_<SECTION>_*` and using the shared `_SECTION_CONFIG`. Plain nesting silently skips env vars and `.env`.
 - The core package never imports cv2, ultralytics or PyYAML. Code needing them lives in modules core does not import (`vision/video.py`, `vision/ultralytics_pose.py`, `labels.py`). A new optional dependency gets its own extra and its own isolated module.
 - The tracker is a pure function, `advance(state, …) -> (new_state, people)`. Coasting tracks are first-class output: `seconds_since_last_seen` is the submersion signal.
+- The rules engine is a pure function too, `evaluate(state, people, now, mode, settings) -> (new_state, events)`. Events are edge-triggered: raised once per incident, never once per frame.
 - Alert channels are one module each under `alerts/`: a pure `build_message` plus a notifier taking an injected `httpx.Client`. Raise delivery errors `from None`, since httpx puts the request URL in its exception text.
 - A monitoring failure (heartbeat ping) is logged and detection continues.
 - A live camera is a `LiveFrameSource` (`vision/live.py`) given a function that opens its stream. Health is frames arriving, never connection state.

@@ -49,8 +49,9 @@ Work happens in reviewable PRs against `main`.
       "distress" clip for rule smoke tests
 - [x] Tracking (ByteTrack-style two-pass IoU, custom) over pose detections —
       `tracking.py`, `--track` on poolguard-replay (PR 5)
-- [ ] Rules engine v0: distress / submersion / entry over track histories
-      (thresholds in config)
+- [~] Rules engine v0: distress / submersion / entry over track histories
+      (thresholds in config). Submersion landed (`rules.py`, runs under
+      `--track`); distress and entry are not written
       - **Resolved (provisional): submersion timeout 15 s → 12 s** so the POC
         clip library can exercise the rule at all. Fitted to footage, not
         derived from safety — must be re-derived on real P1 footage against
@@ -67,8 +68,9 @@ Work happens in reviewable PRs against `main`.
 - [~] Replay-harness regression suite over labeled clips — schema, manifest and
       harness landed (`labels.py`, `tests/labels/shots.yaml`,
       `tests/test_clip_regression.py`, `-m regression`). Tracker assertions
-      (miss + fragmentation) active; event assertions wire up with the rules
-      engine.
+      (miss + fragmentation) and event assertions (verdict + onset window)
+      are both active. No labeled shot is a positive yet: the backyard clips
+      are all too short for the 12 s submersion rule to conclude.
 - [x] Annotated replay HUD (`vision/hud.py`): per-frame clock, live/coasting
       counts, running detection rate, a submersion meter filling toward the
       timeout, the label's expected event, and a priority status line.
@@ -95,6 +97,14 @@ Work happens in reviewable PRs against `main`.
 - [x] Live bench source: SimpliSafe via LiveKit behind `LiveFrameSource`,
       rejoin + blindness heartbeat. Still open: rejoin against a real
       outage, heartbeat against the real Kuma monitor
+- [ ] Pool zone survives a camera re-mount: the outline is traced for one
+      angle and the battery camera moves every time it is charged
+      ([#23](https://github.com/pizzasaurusrex/poolguard/issues/23))
+- [x] Jump-in false alarm: the track left at the pool edge when a swimmer
+      jumps in times out as a submersion (seen on `drowning-test.mp4`).
+      Fixed by the tracker's hand-off pass
+- [ ] Third person in `adult-exits.MP4` is never detected; the hand-off
+      exposed it by removing the split ID that hid it
 - [ ] Local RTSP loop via mediamtx to exercise ingest/reconnect path
 - [ ] PagerDuty Free signup + escalation drill — resolves ADR-006's named
       condition (voice calls on free tier?) with zero hardware

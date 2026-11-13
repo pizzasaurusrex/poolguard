@@ -180,7 +180,7 @@ def render_tracked_replay(
         return writer
 
     try:
-        for frame, result in _tracked_frames(source, estimator, settings):
+        for frame, result in _tracked_frames(source, estimator, settings, rules):
             if start_ts is None:
                 start_ts = result.ts
             frames_seen += 1
@@ -215,7 +215,10 @@ def render_tracked_replay(
 
 
 def _tracked_frames(
-    source: FrameSource, estimator: PoseEstimator, settings: TrackingSettings
+    source: FrameSource,
+    estimator: PoseEstimator,
+    settings: TrackingSettings,
+    rules: RulesSettings,
 ) -> Iterator[tuple[Frame, TrackedFrameResult]]:
     """Pair each source frame with its tracked result.
 
@@ -232,5 +235,5 @@ def _tracked_frames(
                 current.append(frame)
                 yield frame
 
-    for result in run_tracked_replay(_Tap(), estimator, settings):
+    for result in run_tracked_replay(_Tap(), estimator, settings, rules):
         yield current.popleft(), result
