@@ -50,6 +50,7 @@ and rejected.
 - The tracker is a pure function, `advance(state, …) -> (new_state, people)`. Coasting tracks are first-class output: `seconds_since_last_seen` is the submersion signal.
 - Alert channels are one module each under `alerts/`: a pure `build_message` plus a notifier taking an injected `httpx.Client`. Raise delivery errors `from None`, since httpx puts the request URL in its exception text.
 - A monitoring failure (heartbeat ping) is logged and detection continues.
+- A live camera is a `LiveFrameSource` (`vision/live.py`) given a function that opens its stream. Health is frames arriving, never connection state.
 
 ### Testing and tuning
 

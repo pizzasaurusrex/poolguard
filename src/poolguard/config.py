@@ -9,6 +9,8 @@ its own POOLGUARD_<SECTION>_* env vars at Settings() construction time —
 nesting them as plain fields would bypass their env machinery entirely.
 """
 
+from pathlib import Path
+
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -132,8 +134,45 @@ class AlertSettings(BaseSettings):
         description="Seconds between pings. Keep it under the monitor's own heartbeat "
         "interval so one late ping does not read as an outage",
     )
+    blind_after_seconds: float = Field(
+        default=180.0,
+        gt=0,
+        description="Seconds without a frame before the heartbeat reports DOWN. Shorter gaps "
+        "are logged, not alerted: the system runs 24/7 and brief outages are expected",
+    )
     mqtt_host: str | None = None
     escalation_ack_timeout_seconds: float = Field(default=30.0, gt=0)
+
+
+class SimpliSafeSettings(BaseSettings):
+    """Bench-only live source (ADR-002): never the production camera."""
+
+    model_config = SettingsConfigDict(env_prefix="POOLGUARD_SIMPLISAFE_", **_SECTION_CONFIG)
+
+    camera_name: str | None = Field(
+        default=None, description="Camera name as shown in the SimpliSafe app; None disables"
+    )
+    token_path: Path = Field(
+        default=Path.home() / ".config" / "poolguard" / "simplisafe-token.json",
+        description="Where the rotating refresh token is kept, outside the repo",
+    )
+    stale_rejoin_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        description="Seconds without a frame before the stream is left and joined afresh. "
+        "Must exceed a cold join, which takes 8 to 13 s to a first frame",
+    )
+    rejoin_backoff_base_seconds: float = Field(default=2.0, gt=0)
+    rejoin_backoff_cap_seconds: float = Field(default=60.0, gt=0)
+
+    @model_validator(mode="after")
+    def _backoff_cap_is_not_below_base(self) -> "SimpliSafeSettings":
+        if self.rejoin_backoff_cap_seconds < self.rejoin_backoff_base_seconds:
+            raise ValueError(
+                f"rejoin_backoff_cap_seconds ({self.rejoin_backoff_cap_seconds}) must be "
+                f">= rejoin_backoff_base_seconds ({self.rejoin_backoff_base_seconds})"
+            )
+        return self
 
 
 class Settings(BaseSettings):
@@ -143,3 +182,4 @@ class Settings(BaseSettings):
     tracking: TrackingSettings = Field(default_factory=TrackingSettings)
     rules: RulesSettings = Field(default_factory=RulesSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
+    simplisafe: SimpliSafeSettings = Field(default_factory=SimpliSafeSettings)

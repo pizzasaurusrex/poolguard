@@ -4,7 +4,12 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from poolguard.alerts.heartbeat import HeartbeatError, HeartbeatPinger, HeartbeatStatus
+from poolguard.alerts.heartbeat import (
+    HeartbeatError,
+    HeartbeatPinger,
+    HeartbeatStatus,
+    report_for_frame_age,
+)
 
 PUSH_URL = "http://kuma.example:3001/api/push/secret-token"
 
@@ -54,3 +59,23 @@ class TestPing:
         with pytest.raises(HeartbeatError, match="unreachable") as raised:
             pinger(httpx.MockTransport(handler)).ping()
         assert "secret-token" not in str(raised.value)
+
+
+class TestReportForFrameAge:
+    def test_fresh_frames_report_up(self) -> None:
+        report = report_for_frame_age(2.0, blind_after_seconds=180.0)
+        assert report.status is HeartbeatStatus.UP
+
+    def test_a_short_gap_is_tolerated(self) -> None:
+        # Stalls up to 34 s recovered unaided on 2026-10-12; they must not alert.
+        report = report_for_frame_age(179.0, blind_after_seconds=180.0)
+        assert report.status is HeartbeatStatus.UP
+
+    def test_a_long_gap_reports_down_and_says_how_long(self) -> None:
+        report = report_for_frame_age(1290.0, blind_after_seconds=180.0)
+        assert report.status is HeartbeatStatus.DOWN
+        assert "21 min" in report.message
+
+    def test_the_threshold_itself_counts_as_blind(self) -> None:
+        report = report_for_frame_age(180.0, blind_after_seconds=180.0)
+        assert report.status is HeartbeatStatus.DOWN

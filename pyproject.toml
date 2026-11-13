@@ -20,6 +20,10 @@ vision = [
 labels = [
     "pyyaml>=6.0",
 ]
+simplisafe = [
+    "livekit>=1.1",
+    "simplisafe-python>=2026.9.0",
+]
 
 [dependency-groups]
 dev = [
@@ -34,6 +38,8 @@ poolguard = "poolguard.main:main"
 poolguard-alert-test = "poolguard.scripts.alert_test:main"
 poolguard-benchmark = "poolguard.scripts.benchmark_fps:main"
 poolguard-replay = "poolguard.scripts.replay:main"
+poolguard-simplisafe-login = "poolguard.scripts.simplisafe_login:main"
+poolguard-simplisafe-watch = "poolguard.scripts.simplisafe_watch:main"
 
 [build-system]
 requires = ["hatchling"]

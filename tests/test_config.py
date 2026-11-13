@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from poolguard.config import Settings, TrackingSettings
+from poolguard.config import AlertSettings, Settings, SimpliSafeSettings, TrackingSettings
 from poolguard.events import OperatingMode
 
 RTSP = "rtsp://user:pass@10.0.0.5:554/h265Preview_01_main"
@@ -128,3 +128,25 @@ def test_nested_sections_read_the_dotenv_file(
     assert settings.camera.rtsp_url.get_secret_value() == "rtsp://cam/from-dotenv"
     assert settings.alerts.ntfy_topic_url is not None
     assert settings.alerts.ntfy_topic_url.get_secret_value() == "https://ntfy.example/from-dotenv"
+
+
+def test_blindness_alert_defaults_to_three_minutes() -> None:
+    assert AlertSettings().blind_after_seconds == 180.0
+
+
+class TestSimpliSafeSettings:
+    def test_reads_its_own_env_prefix_through_the_parent(
+        self, camera_env: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("POOLGUARD_SIMPLISAFE_CAMERA_NAME", "Back Yard")
+        monkeypatch.setenv("POOLGUARD_SIMPLISAFE_STALE_REJOIN_SECONDS", "45")
+        settings = Settings()
+        assert settings.simplisafe.camera_name == "Back Yard"
+        assert settings.simplisafe.stale_rejoin_seconds == 45.0
+
+    def test_rejoin_fires_well_before_the_blindness_alert(self) -> None:
+        assert SimpliSafeSettings().stale_rejoin_seconds < AlertSettings().blind_after_seconds
+
+    def test_backoff_cap_below_base_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="rejoin_backoff_cap_seconds"):
+            SimpliSafeSettings(rejoin_backoff_base_seconds=10.0, rejoin_backoff_cap_seconds=5.0)

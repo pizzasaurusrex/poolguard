@@ -12,7 +12,7 @@ appears in an error message.
 from enum import StrEnum
 
 import httpx
-from pydantic import SecretStr
+from pydantic import BaseModel, ConfigDict, SecretStr
 
 HEARTBEAT_TIMEOUT_SECONDS = 5.0
 
@@ -20,6 +20,27 @@ HEARTBEAT_TIMEOUT_SECONDS = 5.0
 class HeartbeatStatus(StrEnum):
     UP = "up"
     DOWN = "down"
+
+
+class HeartbeatReport(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    status: HeartbeatStatus
+    message: str
+
+
+def report_for_frame_age(
+    frame_age_seconds: float, *, blind_after_seconds: float
+) -> HeartbeatReport:
+    """What to tell the monitor, given how long it has been since the last frame.
+
+    A process that is running but receiving no video must not look healthy,
+    so UP is earned by fresh frames, not by being alive.
+    """
+    if frame_age_seconds >= blind_after_seconds:
+        minutes = int(frame_age_seconds // 60)
+        return HeartbeatReport(status=HeartbeatStatus.DOWN, message=f"no video for {minutes} min")
+    return HeartbeatReport(status=HeartbeatStatus.UP, message="OK")
 
 
 class HeartbeatError(RuntimeError):
