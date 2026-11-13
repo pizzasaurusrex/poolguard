@@ -40,17 +40,21 @@ class HudState(BaseModel):
     detection_rate: float = Field(ge=0.0, le=1.0)
     """Share of frames so far that produced at least one detection."""
 
-    expected_event: str | None = None
-    onset_window: tuple[float, float] | None = None
+    armed: bool = False
+    in_water_tracks: int = Field(default=0, ge=0)
+    """Live tracks whose box is in the pool zone; while armed, each is an entry."""
+
+    expected: tuple[tuple[str, tuple[float, float]], ...] = ()
+    """The label's expected events as (event name, onset window) pairs."""
     submersion_timeout_seconds: float = Field(gt=0)
 
     @property
-    def in_onset_window(self) -> bool:
-        """True when the clock is inside the window the label expects a fire."""
-        if self.onset_window is None:
-            return False
-        start, end = self.onset_window
-        return start <= self.elapsed_seconds <= end
+    def expecting_now(self) -> str | None:
+        """The labeled event whose onset window the clock is inside, if any."""
+        for event, (start, end) in self.expected:
+            if start <= self.elapsed_seconds <= end:
+                return event
+        return None
 
     @property
     def submersion_progress(self) -> float:
@@ -66,12 +70,14 @@ def status_line(state: HudState) -> tuple[str, tuple[int, int, int]]:
     """
     if state.submersion_progress >= 1.0:
         return f"SUBMERSION — unseen {state.longest_unseen_seconds:.1f}s", _ALERT_COLOR
+    if state.armed and state.in_water_tracks > 0:
+        return f"ENTRY — {state.in_water_tracks} in the water while armed", _ALERT_COLOR
     if state.longest_unseen_seconds > 0:
         return f"in-water track lost {state.longest_unseen_seconds:.1f}s", _WARN_COLOR
     if state.live_tracks == 0:
         return "NO ONE DETECTED", _BLIND_COLOR
-    if state.in_onset_window:
-        return f"in onset window — expecting {state.expected_event}", _WARN_COLOR
+    if state.expecting_now is not None:
+        return f"in onset window — expecting {state.expecting_now}", _WARN_COLOR
     return f"tracking {state.live_tracks}", _CALM_COLOR
 
 
@@ -106,12 +112,13 @@ def draw_hud(canvas: np.ndarray, state: HudState) -> np.ndarray:
 
 def _draw_expectation(canvas: np.ndarray, state: HudState, width: int) -> None:
     """Right-aligned reminder of what the label expects, so drift is obvious."""
-    if state.expected_event is None:
+    if not state.expected:
         label = "label: must stay quiet"
     else:
-        start, end = state.onset_window or (0.0, 0.0)
-        label = f"label: {state.expected_event} @ {start:.1f}-{end:.1f}s"
-    color = _TEXT_COLOR if state.in_onset_window else _MUTED_COLOR
+        label = "label: " + ", ".join(
+            f"{event} @ {start:.1f}-{end:.1f}s" for event, (start, end) in state.expected
+        )
+    color = _TEXT_COLOR if state.expecting_now is not None else _MUTED_COLOR
     (text_width, _), _ = cv2.getTextSize(label, _FONT, 0.45, 1)
     cv2.putText(canvas, label, (width - text_width - 8, 20), _FONT, 0.45, color, 1, cv2.LINE_AA)
 

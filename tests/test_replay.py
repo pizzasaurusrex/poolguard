@@ -124,16 +124,41 @@ class VanishingPersonEstimator:
 
 def test_tracked_replay_raises_submersion_once_when_the_timeout_passes() -> None:
     from poolguard.config import RulesSettings, TrackingSettings
-    from poolguard.events import EventType
+    from poolguard.events import EventType, OperatingMode
     from poolguard.replay import run_tracked_replay
 
     source = ListFrameSource(make_frames(18))  # one frame per second
     rules = RulesSettings(_env_file=None, submersion_timeout_seconds=12.0)
 
     results = list(
-        run_tracked_replay(source, VanishingPersonEstimator(), TrackingSettings(), rules)
+        run_tracked_replay(
+            source, VanishingPersonEstimator(), TrackingSettings(), rules, OperatingMode.SWIM
+        )
     )
 
     raised = [(r.frame_index, e.event_type) for r in results for e in r.events]
     # Last seen on frame 1 (t=1s), so 12s unseen is reached on frame 13.
     assert raised == [(13, EventType.SUBMERSION)]
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [("armed", ["unsupervised_entry"]), ("swim", []), (None, ["unsupervised_entry"])],
+)
+def test_tracked_replay_runs_the_rules_in_the_given_mode(
+    mode: str | None, expected: list[str]
+) -> None:
+    """None falls back to the settings' default mode, which is armed."""
+    from poolguard.config import RulesSettings, TrackingSettings
+    from poolguard.events import OperatingMode
+    from poolguard.replay import run_tracked_replay
+
+    source = ListFrameSource(make_frames(3))
+    rules = RulesSettings(_env_file=None)
+    chosen = OperatingMode(mode) if mode is not None else None
+
+    results = list(
+        run_tracked_replay(source, DriftingPersonEstimator(), TrackingSettings(), rules, chosen)
+    )
+
+    assert [e.event_type.value for r in results for e in r.events] == expected

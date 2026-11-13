@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 
 from poolguard.config import RulesSettings, TrackingSettings
-from poolguard.events import TrackedPerson
+from poolguard.events import OperatingMode, TrackedPerson
 from poolguard.geometry import Polygon
 from poolguard.replay import TrackedFrameResult, run_tracked_replay
 from poolguard.vision.frames import Frame, FrameSource
@@ -130,6 +130,7 @@ def _hud_state(
     frames_with_detections: int,
     label: "ShotLabel | None",
     rules: RulesSettings,
+    mode: OperatingMode,
 ) -> HudState:
     live = tuple(p for p in result.people if p.seconds_since_last_seen == 0.0)
     coasting = tuple(p for p in result.people if p.seconds_since_last_seen > 0.0)
@@ -142,8 +143,11 @@ def _hud_state(
             (p.seconds_since_last_seen for p in coasting if p.in_water), default=0.0
         ),
         detection_rate=frames_with_detections / max(frames_seen, 1),
-        expected_event=label.expected_event.value if label and label.expected_event else None,
-        onset_window=label.onset_window if label else None,
+        armed=mode is OperatingMode.ARMED,
+        in_water_tracks=sum(1 for p in live if p.in_water),
+        expected=tuple((e.event.value, e.onset_window) for e in label.expected_events)
+        if label
+        else (),
         submersion_timeout_seconds=rules.submersion_timeout_seconds,
     )
 
@@ -155,6 +159,7 @@ def render_tracked_replay(
     out_path: str | Path,
     label: "ShotLabel | None" = None,
     rules: RulesSettings | None = None,
+    mode: OperatingMode | None = None,
 ) -> Iterator[TrackedFrameResult]:
     """run_tracked_replay that also writes an annotated video as it goes.
 
@@ -167,6 +172,7 @@ def render_tracked_replay(
     pending: tuple[np.ndarray, TrackedFrameResult] | None = None
     previous_ts = None
     rules = rules or RulesSettings()
+    mode = mode or rules.default_mode
     start_ts = None
     frames_seen = 0
     frames_with_detections = 0
@@ -180,7 +186,7 @@ def render_tracked_replay(
         return writer
 
     try:
-        for frame, result in _tracked_frames(source, estimator, settings, rules):
+        for frame, result in _tracked_frames(source, estimator, settings, rules, mode):
             if start_ts is None:
                 start_ts = result.ts
             frames_seen += 1
@@ -189,7 +195,9 @@ def render_tracked_replay(
             canvas = annotate_frame(frame.image, result.people, settings.pool_zone)
             canvas = draw_hud(
                 canvas,
-                _hud_state(result, start_ts, frames_seen, frames_with_detections, label, rules),
+                _hud_state(
+                    result, start_ts, frames_seen, frames_with_detections, label, rules, mode
+                ),
             )
             if writer is None:
                 if pending is None:
@@ -219,6 +227,7 @@ def _tracked_frames(
     estimator: PoseEstimator,
     settings: TrackingSettings,
     rules: RulesSettings,
+    mode: OperatingMode,
 ) -> Iterator[tuple[Frame, TrackedFrameResult]]:
     """Pair each source frame with its tracked result.
 
@@ -235,5 +244,5 @@ def _tracked_frames(
                 current.append(frame)
                 yield frame
 
-    for result in run_tracked_replay(_Tap(), estimator, settings, rules):
+    for result in run_tracked_replay(_Tap(), estimator, settings, rules, mode):
         yield current.popleft(), result

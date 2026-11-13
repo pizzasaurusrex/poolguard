@@ -56,7 +56,7 @@ and rejected.
 ### Testing and tuning
 
 - Regression tests are behind the `regression` pytest marker and deselected by default; run them with `-m regression`. A shot whose footage is absent locally skips.
-- Labels are per shot in `tests/labels/shots.yaml`. `expected_event` and `onset_window` are set together or not at all. Camera geometry lives in a named `CameraProfile`, with the pool zone as a polygon.
+- Labels are per shot and mode in `tests/labels/shots.yaml`. Every label names its `mode`; each of its `expected_events` carries its own `onset_window`. Camera geometry lives in a named `CameraProfile`, with the pool zone as a polygon.
 - Loosening `MAX_FRAGMENTATION` is a regression that must be argued for in review.
 - `submersion_timeout_seconds` (12.0) is provisional and was fitted to clip lengths. Re-derive it on real footage before it ships.
 - Run inference near native resolution: `imgsz=640` detects nothing on the 1080p backyard footage.

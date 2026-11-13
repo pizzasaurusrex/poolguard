@@ -12,7 +12,7 @@ import pytest
 cv2 = pytest.importorskip("cv2")
 
 from poolguard.config import RulesSettings, TrackingSettings  # noqa: E402
-from poolguard.events import BoundingBox, Detection, TrackedPerson  # noqa: E402
+from poolguard.events import BoundingBox, Detection, OperatingMode, TrackedPerson  # noqa: E402
 from poolguard.geometry import WHOLE_FRAME  # noqa: E402
 from poolguard.replay import TrackedFrameResult  # noqa: E402
 from poolguard.vision.frames import Frame  # noqa: E402
@@ -163,6 +163,7 @@ class TestHudStateFromTracks:
             frames_with_detections=1,
             label=None,
             rules=RulesSettings(),
+            mode=OperatingMode.SWIM,
         )
 
     def test_track_lost_on_the_deck_does_not_run_the_clock(self) -> None:
