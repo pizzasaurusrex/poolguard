@@ -1,7 +1,6 @@
-"""Tests for the rules engine's submersion rule.
+"""Tests for the rules engine: the submersion and entry rules.
 
-The rule's input is the tracker's output: a person last seen in the water who
-has gone unseen for too long. These tests build TrackedPerson values directly,
+The rules' input is the tracker's output. These tests build TrackedPerson values directly,
 so they pin the rule's behaviour without a tracker or a video.
 """
 
@@ -17,6 +16,7 @@ from poolguard.events import (
     Detection,
     EventType,
     OperatingMode,
+    SafetyEvent,
     TrackedPerson,
 )
 from poolguard.rules import RulesState, evaluate
@@ -24,6 +24,7 @@ from poolguard.rules import RulesState, evaluate
 NOW = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
 SETTINGS = RulesSettings(_env_file=None, submersion_timeout_seconds=12.0)
 SWIM = OperatingMode.SWIM
+ARMED = OperatingMode.ARMED
 
 
 def person(track_id: int = 1, unseen: float = 0.0, in_water: bool = True) -> TrackedPerson:
@@ -98,11 +99,10 @@ class TestFiresOncePerIncident:
 
 class TestOperatingMode:
     def test_armed_mode_also_raises_submersion(self) -> None:
-        _, events = evaluate(
-            RulesState(), (person(unseen=12.0),), NOW, OperatingMode.ARMED, SETTINGS
-        )
-        assert len(events) == 1
-        assert events[0].mode is OperatingMode.ARMED
+        _, events = evaluate(RulesState(), (person(unseen=12.0),), NOW, ARMED, SETTINGS)
+        submersions = [e for e in events if e.event_type is EventType.SUBMERSION]
+        assert len(submersions) == 1
+        assert submersions[0].mode is ARMED
 
     def test_maintenance_mode_is_paused(self) -> None:
         _, events = evaluate(
@@ -117,6 +117,76 @@ class TestOperatingMode:
         _, events = evaluate(state, under, NOW, SWIM, SETTINGS)
 
         assert len(events) == 1
+
+
+def entries(events: tuple[SafetyEvent, ...]) -> list[SafetyEvent]:
+    return [event for event in events if event.event_type is EventType.UNSUPERVISED_ENTRY]
+
+
+class TestEntry:
+    def test_person_in_the_water_while_armed_raises_an_emergency(self) -> None:
+        _, events = evaluate(RulesState(), (person(track_id=4),), NOW, ARMED, SETTINGS)
+
+        assert len(events) == 1
+        event = events[0]
+        assert event.event_type is EventType.UNSUPERVISED_ENTRY
+        assert event.tier is AlertTier.EMERGENCY
+        assert event.track_id == 4
+        assert event.mode is ARMED
+        assert event.started_at == NOW
+
+    def test_person_on_the_deck_while_armed_raises_nothing(self) -> None:
+        _, events = evaluate(RulesState(), (person(in_water=False),), NOW, ARMED, SETTINGS)
+        assert events == ()
+
+    def test_swim_mode_allows_people_in_the_water(self) -> None:
+        _, events = evaluate(RulesState(), (person(),), NOW, SWIM, SETTINGS)
+        assert events == ()
+
+    def test_maintenance_mode_raises_no_entry(self) -> None:
+        _, events = evaluate(RulesState(), (person(),), NOW, OperatingMode.MAINTENANCE, SETTINGS)
+        assert events == ()
+
+    def test_a_person_who_enters_and_goes_straight_under_still_raises(self) -> None:
+        """First seen in the water and already lost: entry must not wait for a second sighting."""
+        _, events = evaluate(RulesState(), (person(unseen=0.5),), NOW, ARMED, SETTINGS)
+        assert len(entries(events)) == 1
+
+    def test_each_person_in_the_water_gets_their_own_event(self) -> None:
+        people = (person(track_id=1), person(track_id=2), person(track_id=3, in_water=False))
+        _, events = evaluate(RulesState(), people, NOW, ARMED, SETTINGS)
+        assert sorted(event.track_id for event in events) == [1, 2]
+
+
+class TestEntryFiresOncePerTrack:
+    def test_event_is_not_repeated_while_the_person_stays_in(self) -> None:
+        state, _ = evaluate(RulesState(), (person(),), NOW, ARMED, SETTINGS)
+        _, events = evaluate(state, (person(),), NOW + timedelta(seconds=1), ARMED, SETTINGS)
+        assert events == ()
+
+    def test_stepping_out_and_back_in_does_not_repeat_it(self) -> None:
+        """A box centre jittering across the coping must not re-alert every few frames."""
+        state, _ = evaluate(RulesState(), (person(),), NOW, ARMED, SETTINGS)
+        state, _ = evaluate(state, (person(in_water=False),), NOW, ARMED, SETTINGS)
+        _, events = evaluate(state, (person(),), NOW, ARMED, SETTINGS)
+        assert events == ()
+
+    def test_a_second_person_still_raises(self) -> None:
+        state, _ = evaluate(RulesState(), (person(track_id=1),), NOW, ARMED, SETTINGS)
+        _, events = evaluate(state, (person(track_id=1), person(track_id=2)), NOW, ARMED, SETTINGS)
+        assert [event.track_id for event in events] == [2]
+
+    def test_arming_with_someone_still_in_the_water_raises(self) -> None:
+        """Switching swim mode off while a child is still in the pool is exactly the case."""
+        state, _ = evaluate(RulesState(), (person(),), NOW, ARMED, SETTINGS)
+        state, _ = evaluate(state, (person(),), NOW, SWIM, SETTINGS)
+        _, events = evaluate(state, (person(),), NOW, ARMED, SETTINGS)
+        assert len(entries(events)) == 1
+
+    def test_state_forgets_tracks_that_are_gone(self) -> None:
+        state, _ = evaluate(RulesState(), (person(track_id=5),), NOW, ARMED, SETTINGS)
+        state, _ = evaluate(state, (), NOW, ARMED, SETTINGS)
+        assert state.entered_track_ids == frozenset()
 
 
 class TestImmutability:

@@ -47,7 +47,12 @@ Work happens in reviewable PRs against `main`.
       `tracking.py`, `--track` on poolguard-replay (PR 5)
 - [~] Rules engine v0: distress / submersion / entry over track histories
       (thresholds in config). Submersion landed (`rules.py`, runs under
-      `--track`); distress and entry are not written
+      `--track`). Entry landed: armed, a track in the water raises
+      UNSUPERVISED_ENTRY once (1.3 s into `drowning-test.mp4`, armed).
+      Labels carry a `mode`; distress is not written
+      - **Open: no armed footage with an empty pool for longer than a
+        second.** Entry's false-alarm rate (shadow phantoms over the water,
+        people on the coping) is unmeasured until there is some
       - **Resolved (provisional): submersion timeout 15 s → 12 s** so the POC
         clip library can exercise the rule at all. Fitted to footage, not
         derived from safety — must be re-derived on real P1 footage against

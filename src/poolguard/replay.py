@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from poolguard.config import RulesSettings, TrackingSettings
-from poolguard.events import Detection, SafetyEvent, TrackedPerson
+from poolguard.events import Detection, OperatingMode, SafetyEvent, TrackedPerson
 from poolguard.rules import RulesState, evaluate
 from poolguard.tracking import TrackerState, advance
 from poolguard.vision.frames import FrameSource
@@ -67,20 +67,22 @@ def run_tracked_replay(
     estimator: PoseEstimator,
     settings: TrackingSettings,
     rules: RulesSettings | None = None,
+    mode: OperatingMode | None = None,
 ) -> Iterator[TrackedFrameResult]:
     """run_replay with the tracking and rules stages folded in.
 
     The frame timestamp is the clock for both stages, so replay behaves
     identically at any processing speed — coasting timers and rule timeouts
-    measure video time, not wall-clock time. The operating mode is the
-    rules settings' default_mode.
+    measure video time, not wall-clock time. The operating mode is `mode`,
+    or the rules settings' default_mode when it is not given.
     """
     rules = rules or RulesSettings()
+    mode = mode or rules.default_mode
     tracker_state = TrackerState()
     rules_state = RulesState()
     for result in run_replay(source, estimator):
         tracker_state, people = advance(tracker_state, result.detections, result.ts, settings)
-        rules_state, events = evaluate(rules_state, people, result.ts, rules.default_mode, rules)
+        rules_state, events = evaluate(rules_state, people, result.ts, mode, rules)
         yield TrackedFrameResult(
             frame_index=result.frame_index,
             ts=result.ts,

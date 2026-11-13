@@ -24,8 +24,8 @@ try:
 except ImportError as exc:
     raise SystemExit("vision deps not installed — run: uv sync --extra vision") from exc
 
-from poolguard.config import TrackingSettings
-from poolguard.events import TrackedPerson
+from poolguard.config import RulesSettings, TrackingSettings
+from poolguard.events import OperatingMode, TrackedPerson
 from poolguard.replay import ReplaySummary, run_replay, run_tracked_replay
 
 
@@ -36,10 +36,11 @@ def _describe(person: TrackedPerson) -> str:
 
 
 def _find_label(args: argparse.Namespace) -> "tuple[ShotLabel | None, CameraProfile | None]":
-    """Look up the manifest entry matching the replayed file, and its camera profile.
+    """Look up the manifest entry matching the replayed file and mode, and its camera profile.
 
-    The profile is None when the shot names no camera (scraped footage has no
-    stable geometry), as well as when there is no label.
+    With no --mode, a file labeled in exactly one mode uses that label; a file
+    labeled in several modes needs --mode to choose. The profile is None when
+    the shot names no camera, as well as when there is no label.
     """
     if not args.labels:
         return None, None
@@ -52,11 +53,18 @@ def _find_label(args: argparse.Namespace) -> "tuple[ShotLabel | None, CameraProf
 
     wanted = Path(args.video).name
     manifest = load_shot_labels(Path(args.labels))
-    for shot in manifest.shots:
-        if shot.shot == wanted:
-            return shot, manifest.camera_for(shot)
-    print(f"warning: no label for {wanted} in {args.labels}; replaying without expectations")
-    return None, None
+    candidates = [
+        shot
+        for shot in manifest.shots
+        if shot.shot == wanted and (args.mode is None or shot.mode.value == args.mode)
+    ]
+    if len(candidates) > 1:
+        modes = ", ".join(shot.mode.value for shot in candidates)
+        raise SystemExit(f"{wanted} is labeled in several modes ({modes}); pick one with --mode")
+    if not candidates:
+        print(f"warning: no label for {wanted} in {args.labels}; replaying without expectations")
+        return None, None
+    return candidates[0], manifest.camera_for(candidates[0])
 
 
 def main() -> None:
@@ -83,14 +91,28 @@ def main() -> None:
     parser.add_argument(
         "--labels",
         metavar="SHOTS_YAML",
-        help="shot manifest; the entry matching --video supplies the expected event for the "
-        "overlay and, when its camera has a profile, the pool zone",
+        help="shot manifest; the entry matching --video supplies the expected events for the "
+        "overlay, the operating mode and, when its camera has a profile, the pool zone",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=[mode.value for mode in OperatingMode],
+        default=None,
+        help="operating mode for the rules; defaults to the label's mode, else the configured "
+        "default (armed, where anyone in the water raises an entry)",
     )
     args = parser.parse_args()
     if args.render:
         args.track = True
 
     label, camera = _find_label(args)
+    if args.mode is not None:
+        mode = OperatingMode(args.mode)
+    elif label is not None:
+        mode = label.mode
+    else:
+        mode = RulesSettings().default_mode
+    print(f"mode: {mode.value}")
     settings = TrackingSettings()
     if camera is not None:
         # Already validated by CameraProfile, so a plain copy is safe.
@@ -116,10 +138,10 @@ def main() -> None:
             from poolguard.vision.render import render_tracked_replay
 
             tracked_results = render_tracked_replay(
-                source, estimator, settings, args.render, label=label
+                source, estimator, settings, args.render, label=label, mode=mode
             )
         else:
-            tracked_results = run_tracked_replay(source, estimator, settings)
+            tracked_results = run_tracked_replay(source, estimator, settings, mode=mode)
         for tracked in tracked_results:
             summary = summary.fold(tracked)
             track_ids.update(p.track_id for p in tracked.people)

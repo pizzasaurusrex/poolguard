@@ -12,18 +12,22 @@ it, and a red suite for a missing file would train everyone to ignore red.
 
 Two things are asserted per shot: tracker behavior (does it find the right
 number of people, and does it hold their IDs) and the rules engine's verdict
-(a quiet shot raises nothing; a positive raises its event inside the labeled
-onset window). Each shot is replayed once per run and shared by its tests.
+(a quiet shot raises nothing; a positive raises each labeled event inside its
+onset window, and nothing else). A file may be labeled once per operating
+mode. Detection and tracking run once per file per run; the rules, which are
+cheap, run once per labeled mode over that cached tracker output.
 """
 
+from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
 
 import pytest
 
-from poolguard.config import TrackingSettings
-from poolguard.events import EventType
+from poolguard.config import RulesSettings, TrackingSettings
+from poolguard.events import EventType, OperatingMode, TrackedPerson
 from poolguard.labels import ShotLabel, ShotLabels, load_shot_labels
+from poolguard.rules import RulesState, evaluate
 
 REPO_ROOT = Path(__file__).parent.parent
 MANIFEST = Path(__file__).parent / "labels" / "shots.yaml"
@@ -58,12 +62,17 @@ class RaisedEvent(NamedTuple):
     seconds_in: float
 
 
-class ShotReplay(NamedTuple):
-    """What one shot produced: the facts every test below asserts on."""
+class TrackedFrame(NamedTuple):
+    seconds_in: float
+    ts: datetime
+    people: tuple[TrackedPerson, ...]
 
-    frames: int
+
+class ShotReplay(NamedTuple):
+    """What one file produced through detection and tracking, independent of mode."""
+
+    frames: tuple[TrackedFrame, ...]
     track_count: int
-    events: tuple[RaisedEvent, ...]
 
 
 @pytest.fixture(scope="session")
@@ -87,27 +96,34 @@ def _tracking_settings_for(shot: ShotLabel) -> TrackingSettings:
 
 
 def _replay(shot: ShotLabel, estimator) -> ShotReplay:  # type: ignore[no-untyped-def]
-    """Run one shot through detect, track and rules."""
+    """Run one shot through detection and tracking; the rules run per mode afterwards."""
     from poolguard.replay import run_tracked_replay
     from poolguard.vision.video import VideoFileFrameSource
 
     source = VideoFileFrameSource(str(SHOTS_DIR / shot.shot))
-
-    frames = 0
+    frames: list[TrackedFrame] = []
     track_ids: set[int] = set()
-    events: list[RaisedEvent] = []
     for result in run_tracked_replay(source, estimator, _tracking_settings_for(shot)):
-        frames += 1
         track_ids.update(person.track_id for person in result.people)
         seconds_in = (result.ts - source.start_time).total_seconds()
-        for event in result.events:
-            events.append(RaisedEvent(event.event_type, seconds_in))
-    return ShotReplay(frames=frames, track_count=len(track_ids), events=tuple(events))
+        frames.append(TrackedFrame(seconds_in, result.ts, result.people))
+    return ShotReplay(frames=tuple(frames), track_count=len(track_ids))
+
+
+def _events_in_mode(replay: ShotReplay, mode: OperatingMode) -> tuple[RaisedEvent, ...]:
+    """Apply the rules engine to the cached tracker output, as the live loop would."""
+    rules = RulesSettings(_env_file=None)
+    state = RulesState()
+    raised: list[RaisedEvent] = []
+    for frame in replay.frames:
+        state, events = evaluate(state, frame.people, frame.ts, mode, rules)
+        raised.extend(RaisedEvent(event.event_type, frame.seconds_in) for event in events)
+    return tuple(raised)
 
 
 @pytest.fixture(scope="session")
 def replay_cache() -> dict[str, ShotReplay]:
-    """One replay per shot per run; every test for that shot reads the same result."""
+    """One detection-and-tracking pass per file per run, shared by every mode's label."""
     return {}
 
 
@@ -123,15 +139,15 @@ def replayed(request, estimator, replay_cache):  # type: ignore[no-untyped-def]
 
 
 def _cases() -> list[object]:
-    """One parametrized case per shot, ided by file name so failures name it."""
-    return [pytest.param(shot, id=shot.shot) for shot in SHOTS]
+    """One parametrized case per label, ided by file and mode so failures name both."""
+    return [pytest.param(shot, id=f"{shot.shot}[{shot.mode.value}]") for shot in SHOTS]
 
 
 @pytest.mark.parametrize("replayed", _cases(), indirect=True)
 class TestTrackerOnLabeledShots:
     def test_decodes_frames(self, replayed) -> None:  # type: ignore[no-untyped-def]
         shot, replay = replayed
-        assert replay.frames > 0, f"{shot.shot} decoded no frames"
+        assert replay.frames, f"{shot.shot} decoded no frames"
 
     def test_finds_everyone(self, replayed) -> None:  # type: ignore[no-untyped-def]
         shot, replay = replayed
@@ -152,34 +168,38 @@ class TestTrackerOnLabeledShots:
         )
 
 
+def _is_expected(event: RaisedEvent, shot: ShotLabel) -> bool:
+    return any(
+        expected.event is event.event_type
+        and expected.onset_window[0] <= event.seconds_in <= expected.onset_window[1]
+        for expected in shot.expected_events
+    )
+
+
 @pytest.mark.parametrize("replayed", _cases(), indirect=True)
 class TestEventsOnLabeledShots:
     def test_event_verdict_matches_the_label(self, replayed) -> None:  # type: ignore[no-untyped-def]
-        """A quiet shot raises nothing; a positive raises its event inside the onset window.
+        """Each labeled event fires inside its window, and nothing else fires at all.
 
-        Only the submersion rule exists, so a shot labeled `distress` fails
-        here until that rule is written.
+        There is no distress rule yet, so a shot expecting distress fails here
+        until that rule is written.
         """
         shot, replay = replayed
-        raised = ", ".join(f"{e.event_type.value} at {e.seconds_in:.1f}s" for e in replay.events)
+        events = _events_in_mode(replay, shot.mode)
+        raised = ", ".join(f"{e.event_type.value} at {e.seconds_in:.1f}s" for e in events)
 
-        if shot.expected_event is None:
-            assert replay.events == (), f"{shot.shot}: must stay quiet but raised {raised}"
-            return
-
-        assert shot.onset_window is not None  # the manifest enforces both-or-neither
-        start, end = shot.onset_window
-        on_time = [
-            event
-            for event in replay.events
-            if event.event_type is shot.expected_event and start <= event.seconds_in <= end
-        ]
-        assert on_time, (
-            f"{shot.shot}: expected {shot.expected_event.value} between {start}s and {end}s, "
-            f"raised: {raised or 'nothing'}"
-        )
-        # An alarm outside the window is a false alarm even on a clip that has a real event.
-        outside_window = [e for e in replay.events if not start <= e.seconds_in <= end]
-        assert not outside_window, (
-            f"{shot.shot}: event outside the {start}s to {end}s onset window; raised: {raised}"
+        for expected in shot.expected_events:
+            start, end = expected.onset_window
+            on_time = [
+                e for e in events if e.event_type is expected.event and start <= e.seconds_in <= end
+            ]
+            assert on_time, (
+                f"{shot.shot} [{shot.mode.value}]: expected {expected.event.value} between "
+                f"{start}s and {end}s, raised: {raised or 'nothing'}"
+            )
+        # Anything not covered by a labeled window is a false alarm, even on a clip with a
+        # real event.
+        unexpected = [e for e in events if not _is_expected(e, shot)]
+        assert not unexpected, (
+            f"{shot.shot} [{shot.mode.value}]: unexpected events; raised: {raised}"
         )

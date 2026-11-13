@@ -45,14 +45,15 @@ Currently: **PD phase — no hardware, everything runs on a dev machine**
 | Pose detection on video files | Works, via the replay CLI below |
 | Tracking (persistent IDs, coasting through dropouts) | Works |
 | Annotated replay video with HUD | Works |
-| Regression suite over labeled footage | Tracker assertions run; event assertions wait on the rules engine |
+| Regression suite over labeled footage | Tracker and event assertions run per shot and operating mode |
 | ntfy push and heartbeat alert channels | Built and testable with `poolguard-alert-test`; not yet driven by a live pipeline |
-| Rules engine (distress / submersion / entry) | **Not built — next** |
+| Rules engine (distress / submersion / entry) | Submersion and entry work on replayed footage; distress not built |
 | Siren, Home Assistant, call escalation | Not built |
 | Live camera pipeline, Hailo backend | Not built; no hardware purchased |
 
-So today the code can show you who it sees in a clip and for how long it has
-lost them. It cannot yet decide that anyone is in trouble.
+So today the code can replay a clip, track who it sees, and raise an event
+when someone gets into the pool while armed or stays under too long. Nothing
+yet acts on those events, and it has no notion of a struggling swimmer.
 
 Where to read more:
 
@@ -142,8 +143,10 @@ running detection rate, and a meter filling toward the submersion timeout:
 uv run poolguard-replay --video path/to/clip.mp4 --render out.mp4
 ```
 
-Add `--labels tests/labels/shots.yaml` to show the expected event for that
-clip on the HUD, when the manifest has an entry matching the file name.
+Add `--labels tests/labels/shots.yaml` to show the expected events for that
+clip on the HUD, when the manifest has an entry matching the file name. The
+rules run in the label's mode, or pass `--mode armed|swim`: armed, anyone in
+the water raises an entry; swim, only submersion is watched.
 
 This is the primary debugging tool for tracker behavior — watch the ghost
 box hold a person's identity through a splash or brief occlusion instead of

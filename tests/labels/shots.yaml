@@ -15,18 +15,27 @@
 #   duration_seconds  ffprobe -show_entries format=duration
 #   people            distinct humans visible; the tracker should converge to
 #                     this many IDs, so more IDs than this is fragmentation
-#   expected_event    distress | submersion | unsupervised_entry, or omit for a
-#                     shot that must stay quiet (the false-alarm budget)
-#   onset_window      [start, end] seconds from shot start; the event must fire
-#                     inside this window. Firing late is a failure even when the
-#                     verdict is right — a drowning alert at t+40s is not a save.
-#                     Required whenever expected_event is set, and vice versa.
+#   mode              swim | armed — the mode the shot is replayed in. Required:
+#                     people in the water are a swim session in one mode and an
+#                     emergency in the other. A file may be labeled once per mode.
+#   expected_events   list of {event, onset_window}, or omit for a shot that must
+#                     stay quiet (the false-alarm budget). event is distress |
+#                     submersion | unsupervised_entry; onset_window is [start,
+#                     end] seconds from shot start and the event must fire inside
+#                     it. Firing late is a failure even when the verdict is
+#                     right — a drowning alert at t+40s is not a save. Any event
+#                     not covered by an entry here is a false alarm.
 #   notes             free text; why you labeled it this way
 #
 # TO LABEL: each entry below has its objective fields filled in. `people` is a
 # count from six sampled frames per clip, so confirm it. Then fill in `notes`,
-# and for a shot that should alert add BOTH expected_event and onset_window;
-# leave both off for a shot that must stay quiet.
+# and for a shot that should alert list each event with its onset_window; leave
+# expected_events off for a shot that must stay quiet.
+#
+# Every backyard clip so far is a swim session with people in the water from
+# the first frame, so they are labeled `swim`. Armed, any of them would raise an
+# entry at t=0, which tests nothing. Only drowning-test.mp4 starts with the
+# pool empty, so it is the one clip also labeled `armed`.
 #
 # Thresholds to keep in mind when choosing an onset_window: distress needs 5 s
 # of sustained struggle and submersion needs 12 s unseen, so the earliest
@@ -143,6 +152,7 @@ shots:
     source: adult-exits.MP4
     duration_seconds: 17.35
     people: 3
+    mode: swim
     camera: backyard_simplisafe
     notes: "3 swimmers two in orance swim shirts. One adult exits the pool and walks away. The other two remain in the pool."
 
@@ -150,6 +160,7 @@ shots:
     source: drowning.MP4
     duration_seconds: 17.02
     people: 3
+    mode: swim
     camera: backyard_simplisafe
     notes: "3 swimmers one one the pool deck  and jumps in at 10 seconds. The other two remain in the pool. One of the swimmers in the pool appears to be struggling and goes under at the 15 second mark. The other two swimmers remain in the pool and appear to be unaware of the struggling swimmer."
 
@@ -157,6 +168,7 @@ shots:
     source: jump_in_relax.MP4
     duration_seconds: 13.06
     people: 3
+    mode: swim
     camera: backyard_simplisafe
     notes: "3 swimmers one on the pool. One in the pool and two on the edge of the pool. One swimmer jumps in off the diving board around 11 seconds. "
 
@@ -164,6 +176,7 @@ shots:
     source: jump-in.MP4
     duration_seconds: 16.45
     people: 3
+    mode: swim
     camera: backyard_simplisafe
     notes: "Three swimmers. One exits and jumps in the deep end of the pool. The other two remain in the pool."
 
@@ -171,6 +184,7 @@ shots:
     source: swimmer-mostly-hidden.MP4
     duration_seconds: 21.25
     people: 3
+    mode: swim
     camera: backyard_simplisafe
     notes: "Three swimmers. One on the pool deck and two in the water. One swimmer is in the bottom corner of the pool and difficult to see at the edge."
 
@@ -178,7 +192,22 @@ shots:
     source: drowning-test.mp4
     duration_seconds: 39.87
     people: 1
+    mode: swim
     camera: backyard_simplisafe_remount
     notes: "One swimmer in the pool. The swimmer appears to be struggling and goes under at the 24 second mark. The swimmer remains under water for the remainder of the clip."
-    expected_event: submersion
-    onset_window: [34.0, 39.0]
+    expected_events:
+      - event: submersion
+        onset_window: [34.0, 39.0]
+
+  - shot: drowning-test.mp4
+    source: drowning-test.mp4
+    duration_seconds: 39.87
+    people: 1
+    mode: armed
+    camera: backyard_simplisafe_remount
+    notes: "The same take replayed armed. The pool is empty at the start: the swimmer stands at the edge and jumps in at about 1.4 s, so entry must fire within the PRD's 5 s. Standing on the coping can already count as in the water from this angle (box centre projects over the water), so a fire from t=0 is accepted. The submersion at the end is still real and still expected."
+    expected_events:
+      - event: unsupervised_entry
+        onset_window: [0.0, 5.0]
+      - event: submersion
+        onset_window: [34.0, 39.0]

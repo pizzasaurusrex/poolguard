@@ -42,13 +42,18 @@ class TestHudState:
     def test_submersion_progress_clamps_at_one(self) -> None:
         assert state(longest_unseen_seconds=99.0).submersion_progress == 1.0
 
-    def test_in_onset_window_is_false_without_a_window(self) -> None:
-        assert state(elapsed_seconds=5.0).in_onset_window is False
+    def test_expecting_nothing_without_a_window(self) -> None:
+        assert state(elapsed_seconds=5.0).expecting_now is None
 
-    def test_in_onset_window_is_inclusive(self) -> None:
-        assert state(elapsed_seconds=5.0, onset_window=(5.0, 7.0)).in_onset_window is True
-        assert state(elapsed_seconds=7.0, onset_window=(5.0, 7.0)).in_onset_window is True
-        assert state(elapsed_seconds=7.1, onset_window=(5.0, 7.0)).in_onset_window is False
+    def test_expecting_now_is_inclusive(self) -> None:
+        window = (("distress", (5.0, 7.0)),)
+        assert state(elapsed_seconds=5.0, expected=window).expecting_now == "distress"
+        assert state(elapsed_seconds=7.0, expected=window).expecting_now == "distress"
+        assert state(elapsed_seconds=7.1, expected=window).expecting_now is None
+
+    def test_expecting_now_picks_the_open_window(self) -> None:
+        windows = (("unsupervised_entry", (0.0, 5.0)), ("submersion", (34.0, 39.0)))
+        assert state(elapsed_seconds=35.0, expected=windows).expecting_now == "submersion"
 
 
 class TestStatusPriority:
@@ -58,12 +63,24 @@ class TestStatusPriority:
                 live_tracks=0,
                 coasting_tracks=1,
                 longest_unseen_seconds=12.0,
-                onset_window=(0.0, 99.0),
-                expected_event="submersion",
+                armed=True,
+                in_water_tracks=1,
+                expected=(("submersion", (0.0, 99.0)),),
             )
         )
         assert "SUBMERSION" in text
         assert color == _ALERT_COLOR
+
+    def test_entry_while_armed_outranks_coasting(self) -> None:
+        text, color = status_line(
+            state(armed=True, in_water_tracks=2, coasting_tracks=1, longest_unseen_seconds=3.0)
+        )
+        assert text == "ENTRY — 2 in the water while armed"
+        assert color == _ALERT_COLOR
+
+    def test_people_in_the_water_in_swim_mode_are_not_an_entry(self) -> None:
+        text, _ = status_line(state(armed=False, in_water_tracks=2, live_tracks=2))
+        assert text == "tracking 2"
 
     def test_coasting_outranks_blind_and_calm(self) -> None:
         text, color = status_line(
@@ -86,9 +103,7 @@ class TestStatusPriority:
         assert color == _BLIND_COLOR
 
     def test_onset_window_when_otherwise_nominal(self) -> None:
-        text, color = status_line(
-            state(elapsed_seconds=6.0, onset_window=(5.0, 7.0), expected_event="distress")
-        )
+        text, color = status_line(state(elapsed_seconds=6.0, expected=(("distress", (5.0, 7.0)),)))
         assert "distress" in text
         assert color == _WARN_COLOR
 
