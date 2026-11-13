@@ -31,6 +31,10 @@ ordered only when the P0 bench question (Hailo FPS) is the last one open.
 - First real footage from the backyard camera (2026-08-25) showed input
   resolution is the dominant detection variable: 0% of frames at the default
   640 px input, 87% at 1920. Not yet wired into the pipeline.
+- SimpliSafe live bench source (2026-10-12): `vision/live.py` keeps any live
+  stream alive (rejoin on frame silence, newest-frame-only), with the
+  SimpliSafe adapter in a `simplisafe` extra and `poolguard-simplisafe-watch`
+  reporting blindness to Kuma after 3 min. Not yet wired to detection.
 - **No hardware purchased. Hardware order is deliberately deferred (ADR-010)**
   until PD exit criteria are met.
 
@@ -90,6 +94,9 @@ Work happens in reviewable PRs against `main`.
       `in_water` is a point-in-polygon test; `poolguard-replay --labels`
       applies the shot's camera profile. Not yet checked against real
       backyard footage
+- [x] Live bench source: SimpliSafe via LiveKit behind `LiveFrameSource`,
+      rejoin + blindness heartbeat. Still open: rejoin against a real
+      outage, heartbeat against the real Kuma monitor
 - [ ] Pool zone survives a camera re-mount: the outline is traced for one
       angle and the battery camera moves every time it is charged
       ([#23](https://github.com/pizzasaurusrex/poolguard/issues/23))

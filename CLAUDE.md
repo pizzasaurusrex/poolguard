@@ -51,6 +51,7 @@ and rejected.
 - The rules engine is a pure function too, `evaluate(state, people, now, mode, settings) -> (new_state, events)`. Events are edge-triggered: raised once per incident, never once per frame.
 - Alert channels are one module each under `alerts/`: a pure `build_message` plus a notifier taking an injected `httpx.Client`. Raise delivery errors `from None`, since httpx puts the request URL in its exception text.
 - A monitoring failure (heartbeat ping) is logged and detection continues.
+- A live camera is a `LiveFrameSource` (`vision/live.py`) given a function that opens its stream. Health is frames arriving, never connection state.
 
 ### Testing and tuning
 
