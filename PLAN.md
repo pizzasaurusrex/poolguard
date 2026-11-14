@@ -101,6 +101,9 @@ Work happens in reviewable PRs against `main`.
 - [x] Jump-in false alarm: the track left at the pool edge when a swimmer
       jumps in times out as a submersion (seen on `drowning-test.mp4`).
       Fixed by the tracker's hand-off pass
+- [ ] Entry false alarms at night: first armed cover-on clip (60 s, IR) is
+      quiet only with a correct outline; chairs and a planter on the deck are
+      boxed as people in 71% of frames. See the decision log 2026-11-13
 - [ ] Third person in `adult-exits.MP4` is never detected; the hand-off
       exposed it by removing the split ID that hid it
 - [ ] Local RTSP loop via mediamtx to exercise ingest/reconnect path
