@@ -211,3 +211,11 @@ shots:
         onset_window: [0.0, 5.0]
       - event: submersion
         onset_window: [34.0, 39.0]
+
+  - shot: armed-cover-on-night.mp4
+    source: armed-cover-on-night.mp4
+    duration_seconds: 60.0
+    people: 0
+    mode: armed
+    camera: backyard_simplisafe
+    notes: "Recorded live 2026-11-13 at night (IR, greyscale), cover on, nobody present. Must stay quiet armed. The camera was re-mounted again and sits close to, but not exactly at, the original angle: backyard_simplisafe fits the far and left edges and runs slightly onto the deck at the near right; backyard_simplisafe_remount does not fit at all. Chair frames and a planter on the deck are boxed as people in most frames, so the zero-track check fails."
