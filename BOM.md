@@ -12,7 +12,7 @@ buying/mounting the rest.
 
 | # | Item | Link | Street |
 |---|---|---|---|
-| 1 | Raspberry Pi 5, 8 GB ($80 MSRP bare board; $175 street is typically a kit incl. PSU/microSD/case/cooler — a kit replaces items 4, 5, and 14) | [raspberrypi.com](https://www.raspberrypi.com/products/raspberry-pi-5/) · [PiShop.us](https://www.pishop.us/product/raspberry-pi-5-8gb/) · [CanaKit](https://www.canakit.com/raspberry-pi-5-starter-kit.html) | $175 |
+| 1 | Raspberry Pi 5, 8 GB ($80 MSRP bare board; $175 street is typically a kit incl. PSU/microSD/case/cooler — a kit replaces items 4, 5, and 14) | [rasp  berrypi.com](https://www.raspberrypi.com/products/raspberry-pi-5/) · [PiShop.us](https://www.pishop.us/product/raspberry-pi-5-8gb/) · [CanaKit](https://www.canakit.com/raspberry-pi-5-starter-kit.html) | $175 |
 | 2 | Raspberry Pi AI HAT+ 26 TOPS (Hailo-8) | [raspberrypi.com](https://www.raspberrypi.com/products/ai-hat/) · [PiShop.us](https://www.pishop.us/product/raspberry-pi-ai-hat-26-tops/) · [SparkFun](https://www.sparkfun.com/raspberry-pi-ai-hat-26-tops.html) | $119 |
 | 3 | Reolink RLC-811A 4K PoE camera (IP67, RTSP, 5× optical zoom) | [reolink.com](https://reolink.com/product/rlc-811a/) · [Amazon](https://www.amazon.com/REOLINK-Security-Detection-Spotlight-Time-Lapse/dp/B09873G7X3) | $139 |
 | 4 | 27 W USB-C PSU (official) — skip if Pi kit includes one | [raspberrypi.com](https://www.raspberrypi.com/products/27w-power-supply/) | $12 |

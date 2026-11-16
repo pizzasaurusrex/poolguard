@@ -140,11 +140,12 @@ def _hud_state(
         live_tracks=len(live),
         coasting_tracks=len(coasting),
         longest_unseen_seconds=max(
-            (p.seconds_since_last_seen for p in coasting if p.in_water), default=0.0
+            (p.seconds_since_last_seen for p in coasting if p.water_depth > rules.edge_margin),
+            default=0.0,
         ),
         detection_rate=frames_with_detections / max(frames_seen, 1),
         armed=mode is OperatingMode.ARMED,
-        in_water_tracks=sum(1 for p in live if p.in_water),
+        in_water_tracks=sum(1 for p in live if p.water_depth > rules.edge_margin),
         expected=tuple((e.event.value, e.onset_window) for e in label.expected_events)
         if label
         else (),

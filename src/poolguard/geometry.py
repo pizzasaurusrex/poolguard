@@ -57,3 +57,29 @@ def point_in_polygon(x: float, y: float, polygon: Polygon) -> bool:
                 inside = not inside
         previous_x, previous_y = current_x, current_y
     return inside
+
+
+def depth_inside(x: float, y: float, polygon: Polygon) -> float:
+    """Signed distance from the point to the polygon's outline.
+
+    Positive inside, negative outside, zero on the outline. In normalized
+    units, so a horizontal and a vertical distance of the same value are
+    different numbers of pixels on a non-square frame.
+    """
+    nearest = min(
+        _distance_to_segment(x, y, start, end)
+        for start, end in zip(polygon, polygon[1:] + polygon[:1], strict=True)
+    )
+    return nearest if point_in_polygon(x, y, polygon) else -nearest
+
+
+def _distance_to_segment(x: float, y: float, start: Point, end: Point) -> float:
+    start_x, start_y = start
+    dx, dy = end[0] - start_x, end[1] - start_y
+    length_squared = dx * dx + dy * dy
+    along = (
+        0.0 if length_squared == 0 else ((x - start_x) * dx + (y - start_y) * dy) / length_squared
+    )
+    along = min(max(along, 0.0), 1.0)
+    closest_x, closest_y = start_x + along * dx, start_y + along * dy
+    return ((x - closest_x) ** 2 + (y - closest_y) ** 2) ** 0.5

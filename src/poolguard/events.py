@@ -25,6 +25,7 @@ class EventType(StrEnum):
     DISTRESS = "distress"
     SUBMERSION = "submersion"
     UNSUPERVISED_ENTRY = "unsupervised_entry"
+    PERSON_AT_EDGE = "person_at_edge"
     SYSTEM_DEGRADED = "system_degraded"
 
 
@@ -59,6 +60,9 @@ class TrackedPerson(BaseModel):
     track_id: int
     detection: Detection
     in_water: bool
+    water_depth: float
+    """Signed distance of the foot point from the pool outline, in heights of the
+    person's own box: positive inside, negative outside, 0 on the coping line."""
     seconds_since_last_seen: float = Field(ge=0.0, default=0.0)
 
 

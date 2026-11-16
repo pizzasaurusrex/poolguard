@@ -11,7 +11,8 @@ Usage:
    within about a minute.
 
 The refresh token is written to POOLGUARD_SIMPLISAFE_TOKEN_PATH, readable
-only by you. Needed again only if that file is lost or the token is revoked.
+only by you. Needed again if that file is lost, the token is revoked, or it
+expires after a long unused gap (seen after 32 days, 2026-11-13).
 """
 
 import asyncio

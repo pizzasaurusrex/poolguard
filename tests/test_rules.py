@@ -22,12 +22,20 @@ from poolguard.events import (
 from poolguard.rules import RulesState, evaluate
 
 NOW = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
-SETTINGS = RulesSettings(_env_file=None, submersion_timeout_seconds=12.0)
+SETTINGS = RulesSettings(_env_file=None, submersion_timeout_seconds=12.0, edge_margin=0.2)
 SWIM = OperatingMode.SWIM
 ARMED = OperatingMode.ARMED
 
 
-def person(track_id: int = 1, unseen: float = 0.0, in_water: bool = True) -> TrackedPerson:
+def person(
+    track_id: int = 1,
+    unseen: float = 0.0,
+    in_water: bool = True,
+    depth: float | None = None,
+) -> TrackedPerson:
+    """`depth` defaults to well inside or well outside, away from the edge band."""
+    if depth is None:
+        depth = 1.0 if in_water else -1.0
     return TrackedPerson(
         track_id=track_id,
         detection=Detection(
@@ -36,6 +44,7 @@ def person(track_id: int = 1, unseen: float = 0.0, in_water: bool = True) -> Tra
             confidence=0.8,
         ),
         in_water=in_water,
+        water_depth=depth,
         seconds_since_last_seen=unseen,
     )
 
@@ -187,6 +196,96 @@ class TestEntryFiresOncePerTrack:
         state, _ = evaluate(RulesState(), (person(track_id=5),), NOW, ARMED, SETTINGS)
         state, _ = evaluate(state, (), NOW, ARMED, SETTINGS)
         assert state.entered_track_ids == frozenset()
+
+
+def at_edge(track_id: int = 1, depth: float = 0.02) -> TrackedPerson:
+    """Feet on the coping line: inside or outside the outline by less than the margin."""
+    return person(track_id=track_id, in_water=depth > 0, depth=depth)
+
+
+def of_type(events: tuple[SafetyEvent, ...], event_type: EventType) -> list[SafetyEvent]:
+    return [event for event in events if event.event_type is event_type]
+
+
+class TestEdgeMargin:
+    """Feet within edge_margin box heights of the outline are at the edge, not in the water.
+
+    Measured on armed-cover-on-day-walk.mp4: a person walking the coping reached
+    +0.093; the drowning-test.mp4 swimmer never went below +0.53.
+    """
+
+    @pytest.mark.parametrize("depth", [0.02, 0.093, 0.2])
+    def test_feet_inside_the_margin_are_not_an_entry(self, depth: float) -> None:
+        _, events = evaluate(RulesState(), (at_edge(depth=depth),), NOW, ARMED, SETTINGS)
+        assert of_type(events, EventType.UNSUPERVISED_ENTRY) == []
+
+    def test_feet_past_the_margin_are_an_entry(self) -> None:
+        _, events = evaluate(RulesState(), (person(depth=0.21),), NOW, ARMED, SETTINGS)
+        assert len(of_type(events, EventType.UNSUPERVISED_ENTRY)) == 1
+
+    def test_person_lost_at_the_edge_is_not_a_submersion(self) -> None:
+        """Seen on the day walk: last seen toes-on-coping, lost, timed out as a drowning."""
+        lost_at_edge = person(unseen=12.0, depth=0.02)
+        _, events = evaluate(RulesState(), (lost_at_edge,), NOW, SWIM, SETTINGS)
+        assert of_type(events, EventType.SUBMERSION) == []
+
+    def test_person_lost_past_the_margin_is_a_submersion(self) -> None:
+        lost_in_water = person(unseen=12.0, depth=0.21)
+        _, events = evaluate(RulesState(), (lost_in_water,), NOW, SWIM, SETTINGS)
+        assert len(of_type(events, EventType.SUBMERSION)) == 1
+
+
+class TestPersonAtEdge:
+    @pytest.mark.parametrize("depth", [0.02, -0.02])
+    def test_person_at_the_edge_while_armed_raises_a_warning(self, depth: float) -> None:
+        _, events = evaluate(
+            RulesState(), (at_edge(track_id=4, depth=depth),), NOW, ARMED, SETTINGS
+        )
+
+        assert len(events) == 1
+        event = events[0]
+        assert event.event_type is EventType.PERSON_AT_EDGE
+        assert event.tier is AlertTier.WARN
+        assert event.track_id == 4
+        assert event.started_at == NOW
+
+    def test_person_away_from_the_edge_raises_nothing(self) -> None:
+        on_deck = person(in_water=False, depth=-0.3)
+        _, events = evaluate(RulesState(), (on_deck,), NOW, ARMED, SETTINGS)
+        assert events == ()
+
+    def test_swim_mode_raises_no_warning(self) -> None:
+        _, events = evaluate(RulesState(), (at_edge(),), NOW, SWIM, SETTINGS)
+        assert events == ()
+
+    def test_warning_is_raised_once_per_track(self) -> None:
+        state, first = evaluate(RulesState(), (at_edge(depth=0.02),), NOW, ARMED, SETTINGS)
+        state, second = evaluate(state, (at_edge(depth=-0.03),), NOW, ARMED, SETTINGS)
+        _, third = evaluate(state, (person(in_water=False, depth=-0.5),), NOW, ARMED, SETTINGS)
+        _, fourth = evaluate(state, (at_edge(depth=0.01),), NOW, ARMED, SETTINGS)
+
+        assert len(first) == 1
+        assert second == ()
+        assert third == ()
+        assert fourth == ()
+
+    def test_stepping_in_after_the_warning_still_raises_the_entry(self) -> None:
+        state, _ = evaluate(RulesState(), (at_edge(),), NOW, ARMED, SETTINGS)
+        _, events = evaluate(state, (person(depth=0.3),), NOW, ARMED, SETTINGS)
+
+        assert [event.event_type for event in events] == [EventType.UNSUPERVISED_ENTRY]
+
+    def test_leaving_armed_mode_forgets_the_warning(self) -> None:
+        state, _ = evaluate(RulesState(), (at_edge(),), NOW, ARMED, SETTINGS)
+        state, _ = evaluate(state, (at_edge(),), NOW, SWIM, SETTINGS)
+        _, events = evaluate(state, (at_edge(),), NOW, ARMED, SETTINGS)
+
+        assert len(of_type(events, EventType.PERSON_AT_EDGE)) == 1
+
+    def test_state_forgets_tracks_that_are_gone(self) -> None:
+        state, _ = evaluate(RulesState(), (at_edge(track_id=3),), NOW, ARMED, SETTINGS)
+        state, _ = evaluate(state, (), NOW, ARMED, SETTINGS)
+        assert state.edge_warned_track_ids == frozenset()
 
 
 class TestImmutability:

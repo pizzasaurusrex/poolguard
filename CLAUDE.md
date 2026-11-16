@@ -61,4 +61,5 @@ and rejected.
 - `submersion_timeout_seconds` (12.0) is provisional and was fitted to clip lengths. Re-derive it on real footage before it ships.
 - Run inference near native resolution: `imgsz=640` detects nothing on the 1080p backyard footage.
 - Submersion is only detectable if the person was tracked above water first, so test footage needs a calm lead-in.
+- Rules judge position by `water_depth` against `edge_margin`, never by `in_water` alone.
 - `detections/frame` is not a quality metric. Measure precision and recall against ground-truth boxes.

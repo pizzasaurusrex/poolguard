@@ -40,6 +40,7 @@ def person(track_id: int, unseen: float = 0.0, in_water: bool = True) -> Tracked
             confidence=0.9,
         ),
         in_water=in_water,
+        water_depth=1.0 if in_water else -1.0,
         seconds_since_last_seen=unseen,
     )
 
@@ -181,3 +182,16 @@ class TestHudStateFromTracks:
 
         assert state.coasting_tracks == 2
         assert state.longest_unseen_seconds == 7.0
+
+    def test_person_at_the_edge_is_not_counted_as_in_the_water(self) -> None:
+        """The ENTRY line must match the entry rule, which ignores feet within the edge margin."""
+        at_edge = person(1, in_water=True).model_copy(update={"water_depth": 0.01})
+        in_pool = person(2, in_water=True)
+
+        assert self.hud(at_edge, in_pool).in_water_tracks == 1
+
+    def test_track_lost_at_the_edge_does_not_run_the_clock(self) -> None:
+        """The meter must match the submersion rule, which ignores the edge band."""
+        lost_at_edge = person(1, unseen=7.0, in_water=True).model_copy(update={"water_depth": 0.01})
+
+        assert self.hud(lost_at_edge).longest_unseen_seconds == 0.0
