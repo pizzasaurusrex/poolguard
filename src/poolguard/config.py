@@ -121,6 +121,15 @@ class RulesSettings(BaseSettings):
         "to lose (2% detection rate underwater). Re-derive from staged/P1 footage against the "
         "false-alarm budget — kids dive under routinely — not from clip lengths.",
     )
+    edge_margin: float = Field(
+        default=0.2,
+        ge=0,
+        description="Band either side of the pool outline, in heights of the person's own box, "
+        "that counts as the edge rather than the water. A person must be further inside than "
+        "this to raise an entry or, once lost, a submersion; armed, feet inside the band raise "
+        "a person-at-edge warning. Measured on two clips: walking the coping reached 0.093, one "
+        "swimmer never went below 0.53. Not yet measured: a swimmer at the far wall.",
+    )
     default_mode: OperatingMode = OperatingMode.ARMED
 
 

@@ -262,8 +262,10 @@ shots:
     people: 1
     mode: armed
     camera: backyard_simplisafe_remount
-    notes: "The same take replayed armed. The pool is empty at the start: the swimmer stands at the edge and jumps in at about 1.4 s, so entry must fire within the PRD's 5 s. Standing on the coping can already count as in the water from this angle (box centre projects over the water), so a fire from t=0 is accepted. The submersion at the end is still real and still expected."
+    notes: "The same take replayed armed. The pool is empty at the start: the swimmer stands at the edge and jumps in at about 1.4 s, so entry must fire within the PRD's 5 s. Standing on the coping raises the edge warning, not the entry; the entry fires once he is past the edge margin (measured 1.2 s). The submersion at the end is still real and still expected."
     expected_events:
+      - event: person_at_edge
+        onset_window: [0.0, 1.4]
       - event: unsupervised_entry
         onset_window: [0.0, 5.0]
       - event: submersion
@@ -283,4 +285,11 @@ shots:
     people: 1
     mode: armed
     camera: backyard_simplisafe_2026_11
-    notes: "Recorded live 2026-11-16 about 9 AM, sun and glare, cover on, armed. Sean walks the deck from 0 s to about 190 s and stands at the coping: near right edge about 30 s, far edge about 60-90 s, right end about 165 s, near left edge about 180 s; never steps on the cover. Empty from about 195 s. Must stay quiet: nobody enters the pool."
+    notes: "Recorded live 2026-11-16 about 9 AM, sun and glare, cover on, armed. Sean walks the deck from 0 s to about 200 s and stands at the coping: near right edge about 30 s, far edge about 60-90 s, right end about 165 s, near left edge about 180 s, then leaves along the far edge; never steps on the cover. No entry and no submersion: nobody goes in. Edge warnings are expected while he is at the coping; they fire once per track, so how many depends on how often the tracker loses him."
+    expected_events:
+      - event: person_at_edge
+        onset_window: [0.0, 2.0]
+      - event: person_at_edge
+        onset_window: [55.0, 100.0]
+      - event: person_at_edge
+        onset_window: [160.0, 200.0]
