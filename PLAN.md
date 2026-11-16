@@ -111,6 +111,9 @@ Work happens in reviewable PRs against `main`.
 - [ ] Entry false alarms at night: first armed cover-on clip (60 s, IR) is
       quiet only with a correct outline; chairs and a planter on the deck are
       boxed as people in 71% of frames. See the decision log 2026-11-13
+- [ ] Entry false alarm on someone standing at the pool's end (daylight take,
+      2 in 240 s): `in_water` tests the box centre, which projects over the
+      water from this camera. Candidate fix: test the foot point instead
 - [ ] Third person in `adult-exits.MP4` is never detected; the hand-off
       exposed it by removing the split ID that hid it
 - [ ] Local RTSP loop via mediamtx to exercise ingest/reconnect path

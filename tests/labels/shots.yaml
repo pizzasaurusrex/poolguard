@@ -147,6 +147,63 @@ cameras:
       - [0.214, 0.547]
       - [0.204, 0.548]
 
+  backyard_simplisafe_2026_11:
+    notes: >-
+      The same SimpliSafe camera after a later re-mount, first seen 2026-11-13 in
+      armed-cover-on-night.mp4 and 2026-11-16 in armed-cover-on-day-walk.mp4. Near
+      the original backyard_simplisafe angle but not on it: that outline sits on
+      the deck along the near edge. Hand-traced on the cover's edge from a median
+      of the empty daylight frames (pool fully covered) and checked by zoomed
+      overlay; a colour mask failed here because sun glare turns part of the cover
+      nearly white, the same as the deck.
+    crop_margin: 0.05
+    water_polygon:
+      - [0.205, 0.465]
+      - [0.209, 0.424]
+      - [0.223, 0.389]
+      - [0.246, 0.358]
+      - [0.277, 0.333]
+      - [0.320, 0.317]
+      - [0.367, 0.306]
+      - [0.422, 0.300]
+      - [0.461, 0.299]
+      - [0.508, 0.308]
+      - [0.562, 0.326]
+      - [0.617, 0.340]
+      - [0.664, 0.340]
+      - [0.688, 0.331]
+      - [0.711, 0.317]
+      - [0.742, 0.311]
+      - [0.781, 0.317]
+      - [0.820, 0.333]
+      - [0.859, 0.364]
+      - [0.891, 0.403]
+      - [0.912, 0.442]
+      - [0.920, 0.465]
+      - [0.914, 0.483]
+      - [0.891, 0.500]
+      - [0.869, 0.521]
+      - [0.858, 0.549]
+      - [0.852, 0.583]
+      - [0.840, 0.611]
+      - [0.820, 0.625]
+      - [0.781, 0.633]
+      - [0.734, 0.636]
+      - [0.688, 0.628]
+      - [0.641, 0.611]
+      - [0.594, 0.590]
+      - [0.547, 0.574]
+      - [0.508, 0.562]
+      - [0.477, 0.558]
+      - [0.445, 0.561]
+      - [0.406, 0.569]
+      - [0.367, 0.576]
+      - [0.328, 0.575]
+      - [0.289, 0.562]
+      - [0.250, 0.542]
+      - [0.223, 0.511]
+      - [0.209, 0.486]
+
 shots:
   - shot: adult-exits.MP4
     source: adult-exits.MP4
@@ -217,5 +274,13 @@ shots:
     duration_seconds: 60.0
     people: 0
     mode: armed
-    camera: backyard_simplisafe
-    notes: "Recorded live 2026-11-13 at night (IR, greyscale), cover on, nobody present. Must stay quiet armed. The camera was re-mounted again and sits close to, but not exactly at, the original angle: backyard_simplisafe fits the far and left edges and runs slightly onto the deck at the near right; backyard_simplisafe_remount does not fit at all. Chair frames and a planter on the deck are boxed as people in most frames, so the zero-track check fails."
+    camera: backyard_simplisafe_2026_11
+    notes: "Recorded live 2026-11-13 at night (IR, greyscale), cover on, nobody present. Must stay quiet armed. The camera was re-mounted again and sits close to, but not exactly at, the original angle: Traced as backyard_simplisafe_2026_11 from the 2026-11-16 daylight take. Chair frames and a planter on the deck are boxed as people in most frames, so the zero-track check fails."
+
+  - shot: armed-cover-on-day-walk.mp4
+    source: armed-cover-on-day-walk.mp4
+    duration_seconds: 240.0
+    people: 1
+    mode: armed
+    camera: backyard_simplisafe_2026_11
+    notes: "Recorded live 2026-11-16 about 9 AM, sun and glare, cover on, armed. Sean walks the deck from 0 s to about 190 s and stands at the coping: near right edge about 30 s, far edge about 60-90 s, right end about 165 s, near left edge about 180 s; never steps on the cover. Empty from about 195 s. Must stay quiet: nobody enters the pool."
