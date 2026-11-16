@@ -15,9 +15,12 @@ from poolguard.vision.hud import (  # noqa: E402
     _ALERT_COLOR,
     _BLIND_COLOR,
     _CALM_COLOR,
+    _EDGE_COLOR,
     _WARN_COLOR,
     HudState,
+    alarm_line,
     draw_hud,
+    hud_scale,
     status_line,
 )
 
@@ -78,6 +81,25 @@ class TestStatusPriority:
         assert text == "ENTRY — 2 in the water while armed"
         assert color == _ALERT_COLOR
 
+    def test_person_at_the_edge_while_armed_shows_the_edge_warning(self) -> None:
+        text, color = status_line(state(armed=True, edge_tracks=1))
+        assert text == "EDGE — 1 at the pool edge while armed"
+        assert color == _EDGE_COLOR
+
+    def test_entry_outranks_the_edge_warning(self) -> None:
+        text, _ = status_line(state(armed=True, in_water_tracks=1, edge_tracks=1))
+        assert text.startswith("ENTRY")
+
+    def test_a_running_submersion_clock_outranks_the_edge_warning(self) -> None:
+        text, _ = status_line(
+            state(armed=True, edge_tracks=1, coasting_tracks=1, longest_unseen_seconds=3.0)
+        )
+        assert "lost 3.0s" in text
+
+    def test_people_at_the_edge_in_swim_mode_are_not_a_warning(self) -> None:
+        text, _ = status_line(state(armed=False, edge_tracks=1))
+        assert text == "tracking 1"
+
     def test_people_in_the_water_in_swim_mode_are_not_an_entry(self) -> None:
         text, _ = status_line(state(armed=False, in_water_tracks=2, live_tracks=2))
         assert text == "tracking 2"
@@ -127,3 +149,40 @@ class TestDrawHud:
     def test_draws_something(self) -> None:
         frame = np.zeros((120, 200, 3), dtype=np.uint8)
         assert draw_hud(frame, state()).any(), "HUD drew nothing onto the frame"
+
+
+class TestScale:
+    """Drawn at 1x for a 960 px frame; a 1080p demo video is watched shrunk on a phone."""
+
+    @pytest.mark.parametrize(("width", "scale"), [(640, 1.0), (960, 1.0), (1920, 2.0)])
+    def test_scale_follows_frame_width_and_never_shrinks(self, width: int, scale: float) -> None:
+        assert hud_scale(width) == scale
+
+    def test_panel_grows_with_the_frame(self) -> None:
+        small = draw_hud(np.zeros((480, 640, 3), dtype=np.uint8), state())
+        large = draw_hud(np.zeros((1080, 1920, 3), dtype=np.uint8), state())
+
+        assert not small[100].any(), "1x panel should end well above row 100"
+        assert large[140].any(), "2x panel should reach row 140"
+
+
+class TestAlarmLine:
+    """Raised events stay on screen: the status line only shows what is true right now,
+    so an entry raised mid-jump would otherwise flash for one frame."""
+
+    def test_nothing_raised_draws_no_line(self) -> None:
+        assert alarm_line(state()) is None
+
+    def test_raised_events_are_listed_in_order_with_their_times(self) -> None:
+        raised = (("person_at_edge", 0.0), ("unsupervised_entry", 1.2), ("submersion", 37.0))
+        text, color = alarm_line(state(raised=raised))  # type: ignore[misc]
+
+        assert text == "RAISED  EDGE 0.0s  |  ENTRY 1.2s  |  SUBMERSION 37.0s"
+        assert color == _ALERT_COLOR
+
+    def test_repeats_of_one_event_collapse_to_the_first_with_a_count(self) -> None:
+        raised = (("person_at_edge", 0.0), ("person_at_edge", 84.7), ("person_at_edge", 88.6))
+        text, color = alarm_line(state(raised=raised))  # type: ignore[misc]
+
+        assert text == "RAISED  EDGE 0.0s (+2)"
+        assert color == _EDGE_COLOR

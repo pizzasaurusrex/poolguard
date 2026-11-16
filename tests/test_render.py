@@ -12,7 +12,15 @@ import pytest
 cv2 = pytest.importorskip("cv2")
 
 from poolguard.config import RulesSettings, TrackingSettings  # noqa: E402
-from poolguard.events import BoundingBox, Detection, OperatingMode, TrackedPerson  # noqa: E402
+from poolguard.events import (  # noqa: E402
+    AlertTier,
+    BoundingBox,
+    Detection,
+    EventType,
+    OperatingMode,
+    SafetyEvent,
+    TrackedPerson,
+)
 from poolguard.geometry import WHOLE_FRAME  # noqa: E402
 from poolguard.replay import TrackedFrameResult  # noqa: E402
 from poolguard.vision.frames import Frame  # noqa: E402
@@ -190,8 +198,45 @@ class TestHudStateFromTracks:
 
         assert self.hud(at_edge, in_pool).in_water_tracks == 1
 
+    def test_live_people_within_the_margin_count_as_at_the_edge(self) -> None:
+        inside_band = person(1, in_water=True).model_copy(update={"water_depth": 0.1})
+        outside_band = person(2, in_water=False).model_copy(update={"water_depth": -0.1})
+        on_deck = person(3, in_water=False)
+        in_pool = person(4, in_water=True)
+
+        assert self.hud(inside_band, outside_band, on_deck, in_pool).edge_tracks == 2
+
     def test_track_lost_at_the_edge_does_not_run_the_clock(self) -> None:
         """The meter must match the submersion rule, which ignores the edge band."""
         lost_at_edge = person(1, unseen=7.0, in_water=True).model_copy(update={"water_depth": 0.01})
 
         assert self.hud(lost_at_edge).longest_unseen_seconds == 0.0
+
+    def test_events_raised_on_a_frame_are_passed_to_the_hud(self) -> None:
+        event = SafetyEvent(
+            event_type=EventType.UNSUPERVISED_ENTRY,
+            tier=AlertTier.EMERGENCY,
+            started_at=START,
+            mode=OperatingMode.ARMED,
+            confidence=0.9,
+            detail="entry",
+        )
+        result = TrackedFrameResult(
+            frame_index=24,
+            ts=START + timedelta(seconds=1.2),
+            detections=(),
+            people=(),
+            events=(event,),
+        )
+        state = _hud_state(
+            result,
+            start_ts=START,
+            frames_seen=25,
+            frames_with_detections=25,
+            label=None,
+            rules=RulesSettings(),
+            mode=OperatingMode.ARMED,
+            raised=(("person_at_edge", 0.0),),
+        )
+
+        assert state.raised == (("person_at_edge", 0.0), ("unsupervised_entry", 1.2))
