@@ -376,6 +376,18 @@ class TestInWater:
 
         assert people[0].in_water is True
 
+    def test_water_depth_is_measured_in_the_person_s_own_box_heights(self) -> None:
+        """Box height scales with distance from the camera, so the depth does too."""
+        water_below = ((0.0, 0.5), (1.0, 0.5), (1.0, 1.0), (0.0, 1.0))
+        settings = SETTINGS.model_copy(update={"pool_zone": water_below})
+        near = det(0.4, 0.4, height=0.4)  # feet (0.45, 0.8): 0.2 from the bottom = 0.5 heights
+        far = det(0.6, 0.35, height=0.1)  # feet (0.65, 0.45): 0.05 outside = -0.5 heights
+        _, people = advance(TrackerState(), (near, far), START, settings)
+        by_x = {round(p.detection.box.x, 1): p.water_depth for p in people}
+
+        assert by_x[0.4] == pytest.approx(0.5)
+        assert by_x[0.6] == pytest.approx(-0.5)
+
     def test_zone_membership_by_horizontal_position(self) -> None:
         left_half = ((0.0, 0.0), (0.5, 0.0), (0.5, 1.0), (0.0, 1.0))
         settings = SETTINGS.model_copy(update={"pool_zone": left_half})

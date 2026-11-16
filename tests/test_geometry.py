@@ -2,7 +2,7 @@
 
 import pytest
 
-from poolguard.geometry import WHOLE_FRAME, point_in_polygon, validate_polygon
+from poolguard.geometry import WHOLE_FRAME, depth_inside, point_in_polygon, validate_polygon
 
 SQUARE = ((0.2, 0.2), (0.6, 0.2), (0.6, 0.6), (0.2, 0.6))
 
@@ -34,6 +34,25 @@ class TestPointInPolygon:
 
     def test_whole_frame_contains_any_interior_point(self) -> None:
         assert point_in_polygon(0.01, 0.99, WHOLE_FRAME) is True
+
+
+class TestDepthInside:
+    """Signed distance to the outline: positive inside, negative outside."""
+
+    def test_inside_is_the_distance_to_the_nearest_edge(self) -> None:
+        assert depth_inside(0.3, 0.4, SQUARE) == pytest.approx(0.1)
+
+    def test_outside_is_negative(self) -> None:
+        assert depth_inside(0.4, 0.75, SQUARE) == pytest.approx(-0.15)
+
+    def test_on_the_edge_is_zero(self) -> None:
+        assert depth_inside(0.4, 0.6, SQUARE) == pytest.approx(0.0)
+
+    def test_outside_a_corner_measures_to_the_vertex(self) -> None:
+        assert depth_inside(0.7, 0.7, SQUARE) == pytest.approx(-(0.02**0.5))
+
+    def test_in_a_concave_notch_measures_to_the_nearest_edge_of_the_shape(self) -> None:
+        assert depth_inside(0.75, 0.4, L_SHAPE) == pytest.approx(-0.1)
 
 
 class TestValidatePolygon:

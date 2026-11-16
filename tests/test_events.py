@@ -92,5 +92,6 @@ class TestTrackedPerson:
                 track_id=1,
                 detection=make_detection(),
                 in_water=True,
+                water_depth=1.0,
                 seconds_since_last_seen=-1.0,
             )

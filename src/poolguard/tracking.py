@@ -33,7 +33,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from poolguard.config import TrackingSettings
 from poolguard.events import BoundingBox, Detection, TrackedPerson
-from poolguard.geometry import Polygon, point_in_polygon
+from poolguard.geometry import Point, Polygon, depth_inside, point_in_polygon
 
 
 class Track(BaseModel):
@@ -259,6 +259,7 @@ def _to_person(track: Track, now: AwareDatetime, settings: TrackingSettings) -> 
         track_id=track.track_id,
         detection=track.last_detection,
         in_water=_in_zone(track.last_detection.box, settings.pool_zone),
+        water_depth=_water_depth(track.last_detection.box, settings.pool_zone),
         seconds_since_last_seen=_seconds_unseen(track, now),
     )
 
@@ -279,6 +280,17 @@ def _in_zone(box: BoundingBox, zone: Polygon) -> bool:
     The zone is traced on the ground, and from an elevated camera the box centre
     of someone standing at the edge projects over the water.
     """
-    foot_x = box.x + box.width / 2
-    foot_y = box.y + box.height
-    return point_in_polygon(foot_x, foot_y, zone)
+    return point_in_polygon(*_foot_point(box), zone)
+
+
+def _water_depth(box: BoundingBox, zone: Polygon) -> float:
+    """How far the foot point is inside the zone, in heights of the person's own box.
+
+    Box height shrinks with distance from the camera, so this is roughly the same
+    physical distance near and far; a fixed share of the frame is not.
+    """
+    return depth_inside(*_foot_point(box), zone) / box.height
+
+
+def _foot_point(box: BoundingBox) -> Point:
+    return (box.x + box.width / 2, box.y + box.height)

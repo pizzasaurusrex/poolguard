@@ -111,10 +111,11 @@ Work happens in reviewable PRs against `main`.
 - [ ] Entry false alarms at night: first armed cover-on clip (60 s, IR) is
       quiet only with a correct outline; chairs and a planter on the deck are
       boxed as people in 71% of frames. See the decision log 2026-11-13
-- [~] Entry false alarm on someone standing at the pool's edge (daylight
-      take). `in_water` now tests the foot point, which fixed the pool's ends;
-      toes-on-coping at the far edge still fires (1-4 px inside the outline).
-      Open: a margin, and what it costs at the far wall
+- [x] Entry false alarm on someone standing at the pool's edge: foot point
+      instead of box centre, then a 0.2 box-height edge margin for entry and
+      submersion, with a warn-tier person-at-edge event while armed. Day walk
+      goes from 2 false entries + 1 false submersion to 0. Still open: a
+      swimmer at the far wall, a slip-in at the very edge
 - [ ] Third person in `adult-exits.MP4` is never detected; the hand-off
       exposed it by removing the split ID that hid it
 - [ ] Local RTSP loop via mediamtx to exercise ingest/reconnect path
