@@ -274,6 +274,11 @@ def _seconds_unseen(track: Track, now: AwareDatetime) -> float:
 
 
 def _in_zone(box: BoundingBox, zone: Polygon) -> bool:
-    center_x = box.x + box.width / 2
-    center_y = box.y + box.height / 2
-    return point_in_polygon(center_x, center_y, zone)
+    """Whether the person's foot point, the bottom centre of the box, is in the zone.
+
+    The zone is traced on the ground, and from an elevated camera the box centre
+    of someone standing at the edge projects over the water.
+    """
+    foot_x = box.x + box.width / 2
+    foot_y = box.y + box.height
+    return point_in_polygon(foot_x, foot_y, zone)

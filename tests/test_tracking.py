@@ -354,7 +354,29 @@ class TestCoasting:
 
 
 class TestInWater:
-    def test_zone_membership_by_box_center(self) -> None:
+    def test_person_standing_at_the_edge_is_not_in_water(self) -> None:
+        """From an elevated camera a standing person's middle projects over the water.
+
+        Seen on armed-cover-on-day-walk.mp4: feet on the coping at the pool's end,
+        box centre over the cover, two false entry alarms. Where someone stands is
+        their feet, so the zone test uses the bottom of the box.
+        """
+        water_above = ((0.0, 0.0), (1.0, 0.0), (1.0, 0.5), (0.0, 0.5))
+        settings = SETTINGS.model_copy(update={"pool_zone": water_above})
+        standing = det(0.4, 0.2, height=0.4)  # centre y 0.4 (over water), feet y 0.6 (deck)
+        _, people = advance(TrackerState(), (standing,), START, settings)
+
+        assert people[0].in_water is False
+
+    def test_swimmer_whose_upper_body_projects_past_the_waterline_is_in_water(self) -> None:
+        water_below = ((0.0, 0.5), (1.0, 0.5), (1.0, 1.0), (0.0, 1.0))
+        settings = SETTINGS.model_copy(update={"pool_zone": water_below})
+        swimming = det(0.4, 0.3, height=0.3)  # centre y 0.45 (deck side), bottom y 0.6 (water)
+        _, people = advance(TrackerState(), (swimming,), START, settings)
+
+        assert people[0].in_water is True
+
+    def test_zone_membership_by_horizontal_position(self) -> None:
         left_half = ((0.0, 0.0), (0.5, 0.0), (0.5, 1.0), (0.0, 1.0))
         settings = SETTINGS.model_copy(update={"pool_zone": left_half})
         _, people = advance(TrackerState(), (det(0.1, 0.1), det(0.7, 0.1)), START, settings)
