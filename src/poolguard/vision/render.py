@@ -20,7 +20,7 @@ from poolguard.events import OperatingMode, TrackedPerson
 from poolguard.geometry import Polygon
 from poolguard.replay import TrackedFrameResult, run_tracked_replay
 from poolguard.vision.frames import Frame, FrameSource
-from poolguard.vision.hud import HudState, draw_hud
+from poolguard.vision.hud import HudState, draw_hud, hud_scale
 from poolguard.vision.pose import PoseEstimator
 
 if TYPE_CHECKING:
@@ -56,11 +56,12 @@ def annotate_frame(
     """Return a copy of the frame with the tracker's view drawn on it."""
     canvas = image.copy()
     height, width = canvas.shape[:2]
+    k = hud_scale(width)
 
     zone_pixels = np.array(
         [(int(x * width), int(y * height)) for x, y in pool_zone], dtype=np.int32
     )
-    cv2.polylines(canvas, [zone_pixels], isClosed=True, color=_ZONE_COLOR, thickness=1)
+    cv2.polylines(canvas, [zone_pixels], isClosed=True, color=_ZONE_COLOR, thickness=round(k))
 
     for person in people:
         box = person.detection.box
@@ -71,9 +72,9 @@ def annotate_frame(
         )
         color = color_for_track(person.track_id)
         if person.seconds_since_last_seen == 0.0:
-            _draw_live(canvas, person, top_left, bottom_right, color)
+            _draw_live(canvas, person, top_left, bottom_right, color, k)
         else:
-            _draw_coasting(canvas, person, top_left, bottom_right, color)
+            _draw_coasting(canvas, person, top_left, bottom_right, color, k)
     return canvas
 
 
@@ -83,18 +84,10 @@ def _draw_live(
     top_left: tuple[int, int],
     bottom_right: tuple[int, int],
     color: tuple[int, int, int],
+    k: float,
 ) -> None:
-    cv2.rectangle(canvas, top_left, bottom_right, color, 2)
-    cv2.putText(
-        canvas,
-        f"#{person.track_id}",
-        (top_left[0], max(top_left[1] - 6, 12)),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        color,
-        1,
-        cv2.LINE_AA,
-    )
+    cv2.rectangle(canvas, top_left, bottom_right, color, round(2 * k))
+    _label(canvas, f"#{person.track_id}", top_left, color, k)
 
 
 def _draw_coasting(
@@ -103,6 +96,7 @@ def _draw_coasting(
     top_left: tuple[int, int],
     bottom_right: tuple[int, int],
     color: tuple[int, int, int],
+    k: float,
 ) -> None:
     """Draw a track the detector has lost: the ghost box at its last-seen spot.
 
@@ -110,16 +104,22 @@ def _draw_coasting(
     system is watching this spot" and show how long the person has been
     unseen (person.seconds_since_last_seen).
     """
-    cv2.rectangle(canvas, top_left, bottom_right, color, 1)
+    cv2.rectangle(canvas, top_left, bottom_right, color, round(k))
+    label = f"#{person.track_id} (unseen/lost {person.seconds_since_last_seen:.1f}s)"
+    _label(canvas, label, top_left, color, k)
+
+
+def _label(
+    canvas: np.ndarray,
+    text: str,
+    top_left: tuple[int, int],
+    color: tuple[int, int, int],
+    k: float,
+) -> None:
+    """Track label just above the box, kept on screen when the box touches the top."""
+    origin = (top_left[0], max(top_left[1] - round(6 * k), round(12 * k)))
     cv2.putText(
-        canvas,
-        f"#{person.track_id} (unseen/lost {person.seconds_since_last_seen:.1f}s)",
-        (top_left[0], max(top_left[1] - 6, 12)),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        color,
-        1,
-        cv2.LINE_AA,
+        canvas, text, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.5 * k, color, round(k), cv2.LINE_AA
     )
 
 
@@ -131,13 +131,17 @@ def _hud_state(
     label: "ShotLabel | None",
     rules: RulesSettings,
     mode: OperatingMode,
+    raised: tuple[tuple[str, float], ...] = (),
 ) -> HudState:
+    elapsed = (result.ts - start_ts).total_seconds()
+    raised = raised + tuple((event.event_type.value, elapsed) for event in result.events)
     live = tuple(p for p in result.people if p.seconds_since_last_seen == 0.0)
     coasting = tuple(p for p in result.people if p.seconds_since_last_seen > 0.0)
     return HudState(
         frame_index=result.frame_index,
-        elapsed_seconds=(result.ts - start_ts).total_seconds(),
+        elapsed_seconds=elapsed,
         live_tracks=len(live),
+        raised=raised,
         coasting_tracks=len(coasting),
         longest_unseen_seconds=max(
             (p.seconds_since_last_seen for p in coasting if p.water_depth > rules.edge_margin),
@@ -146,6 +150,7 @@ def _hud_state(
         detection_rate=frames_with_detections / max(frames_seen, 1),
         armed=mode is OperatingMode.ARMED,
         in_water_tracks=sum(1 for p in live if p.water_depth > rules.edge_margin),
+        edge_tracks=sum(1 for p in live if abs(p.water_depth) <= rules.edge_margin),
         expected=tuple((e.event.value, e.onset_window) for e in label.expected_events)
         if label
         else (),
@@ -177,6 +182,7 @@ def render_tracked_replay(
     start_ts = None
     frames_seen = 0
     frames_with_detections = 0
+    raised: tuple[tuple[str, float], ...] = ()
 
     def open_writer(canvas: np.ndarray, fps: float) -> cv2.VideoWriter:
         height, width = canvas.shape[:2]
@@ -194,12 +200,11 @@ def render_tracked_replay(
             if result.detections:
                 frames_with_detections += 1
             canvas = annotate_frame(frame.image, result.people, settings.pool_zone)
-            canvas = draw_hud(
-                canvas,
-                _hud_state(
-                    result, start_ts, frames_seen, frames_with_detections, label, rules, mode
-                ),
+            hud = _hud_state(
+                result, start_ts, frames_seen, frames_with_detections, label, rules, mode, raised
             )
+            raised = hud.raised
+            canvas = draw_hud(canvas, hud)
             if writer is None:
                 if pending is None:
                     pending = (canvas, result)
